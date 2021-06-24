@@ -1,0 +1,8 @@
+/bolt-proxy
+/venv/
+/probe
+.#*
+ignore/
+*.crt
+*.key
+*.pem

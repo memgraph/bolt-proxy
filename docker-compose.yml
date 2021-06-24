@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+    memgraph:
+        image: memgraph/memgraph
+        entrypoint: ["/usr/lib/memgraph/memgraph", "--telemetry-enabled=false", "--log-level=TRACE"]
+    bolt-proxy:
+        build:
+            context: .
+        image: bolt-proxy
+        ports:
+            - 8080:8080
+        environment:
+            BOLT_PROXY_BIND: "0.0.0.0:8080"
+            BOLT_PROXY_URI: "bolt://memgraph:7687"
+            BOLT_PROXY_DEBUG: "1"
+        restart: on-failure
