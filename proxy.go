@@ -79,11 +79,6 @@ func main() {
 		proxy_logger.SetUpDebugLog(ioutil.Discard)
 	}
 
-	// ---------- pprof debugger
-	// go func() {
-	// 	info.Println(http.ListenAndServe("localhost:6060", nil))
-	// }()
-
 	// ---------- BACK END
 	proxy_logger.InfoLog.Println("starting bolt-proxy backend")
 	backend, err := backend.NewBackend(proxy_params.username, proxy_params.password, proxy_params.proxyTo)

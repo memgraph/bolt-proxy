@@ -10,6 +10,7 @@ import (
 	"github.com/memgraph/bolt-proxy/backend"
 	"github.com/memgraph/bolt-proxy/bolt"
 	"github.com/memgraph/bolt-proxy/health"
+	"github.com/memgraph/bolt-proxy/proxy_logger"
 )
 
 const MAX_IDLE_MINS int = 30
@@ -38,7 +39,7 @@ func handleTx(client, server bolt.BoltConn, ack chan<- bool, halt <-chan bool) {
 				if err != nil {
 					panic(err)
 				}
-				logMessage("C<-P", msg)
+				proxy_logger.LogMessage("C<-P", msg)
 
 				// if know the server side is saying goodbye,
 				// we abort the loop
@@ -46,7 +47,7 @@ func handleTx(client, server bolt.BoltConn, ack chan<- bool, halt <-chan bool) {
 					finished = true
 				}
 			} else {
-				debug.Println("potential server hangup")
+				proxy_logger.DebugLog.Println("potential server hangup")
 				finished = true
 			}
 
@@ -54,16 +55,16 @@ func handleTx(client, server bolt.BoltConn, ack chan<- bool, halt <-chan bool) {
 			finished = true
 
 		case <-time.After(time.Duration(MAX_IDLE_MINS) * time.Minute):
-			warn.Println("timeout reading server!")
+			proxy_logger.DebugLog.Println("Timeout reading server!")
 			finished = true
 		}
 	}
 
 	select {
 	case ack <- true:
-		debug.Println("tx handler stop ACK sent")
+		proxy_logger.DebugLog.Println("Tx handler stop ACK sent")
 	default:
-		warn.Println("couldn't put value in ack channel?!")
+		proxy_logger.DebugLog.Println("Couldn't put value in ack channel?!")
 	}
 }
 
@@ -74,7 +75,7 @@ func handleTx(client, server bolt.BoltConn, ack chan<- bool, halt <-chan bool) {
 // a client handler
 func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 	defer func() {
-		debug.Printf("Closing client connection from %s\n",
+		proxy_logger.DebugLog.Printf("Closing client connection from %s\n",
 			conn.RemoteAddr())
 		conn.Close()
 	}()
@@ -84,14 +85,14 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 
 	data, err := conn.Read(buf[:4])
 	if err != nil || data != 4 {
-		warn.Println("bad connection from", conn.RemoteAddr())
+		proxy_logger.DebugLog.Println("Bad connection from", conn.RemoteAddr())
 		return
 	}
 	if bytes.Equal(buf[:4], []byte{0x60, 0x60, 0xb0, 0x17}) {
 		// First case: we have a direct bolt client connection
 		n, err := conn.Read(buf[:20])
 		if err != nil {
-			warn.Println("error peeking at connection from", conn.RemoteAddr())
+			proxy_logger.DebugLog.Println("Error peeking at connection from", conn.RemoteAddr())
 			return
 		}
 		// Make sure we try to use the version we're using the best
@@ -99,14 +100,14 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		serverVersion := backend_server.Version().Bytes()
 		clientVersion, err := bolt.ValidateHandshake(buf[:n], serverVersion)
 		if err != nil {
-			warn.Fatal(err)
+			proxy_logger.DebugLog.Fatal(err)
 		}
 		_, err = conn.Write(clientVersion)
 		if err != nil {
-			warn.Fatal(err)
+			proxy_logger.DebugLog.Fatal(err)
 		}
 		// regular bolt
-		info.Print("Regular bolt")
+		proxy_logger.InfoLog.Println("Regular bolt")
 		handleBoltConn(bolt.NewDirectConn(conn), clientVersion, backend_server)
 
 	} else if bytes.Equal(buf[:4], []byte{0x47, 0x45, 0x54, 0x20}) {
@@ -116,7 +117,7 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		// Read the rest of the request
 		data, err = conn.Read(buf[4:])
 		if err != nil {
-			warn.Printf("failed reading rest of GET request: %s\n", err)
+			proxy_logger.DebugLog.Printf("failed reading rest of GET request: %s\n", err)
 			return
 		}
 
@@ -124,7 +125,7 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		if health.IsHealthCheck(buf[:data+4]) {
 			err = health.HandleHealthCheck(conn, buf[:data+4])
 			if err != nil {
-				warn.Println(err)
+				proxy_logger.DebugLog.Println(err)
 			}
 			return
 		}
@@ -134,14 +135,14 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		iobuf := bytes.NewBuffer(buf[:data+4])
 		_, err := ws.Upgrade(iobuf)
 		if err != nil {
-			warn.Printf("failed to upgrade websocket client %s: %s\n",
+			proxy_logger.DebugLog.Printf("Failed to upgrade websocket client %s: %s\n",
 				conn.RemoteAddr(), err)
 			return
 		}
 		// Relay the upgrade response
 		_, err = io.Copy(conn, iobuf)
 		if err != nil {
-			warn.Printf("failed to copy upgrade to client %s\n",
+			proxy_logger.DebugLog.Printf("failed to copy upgrade to client %s\n",
 				conn.RemoteAddr())
 			return
 		}
@@ -149,13 +150,13 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		// After upgrade, we should get a WebSocket message with header
 		header, err := ws.ReadHeader(conn)
 		if err != nil {
-			warn.Printf("failed to read ws header from client %s: %s\n",
+			proxy_logger.DebugLog.Printf("failed to read ws header from client %s: %s\n",
 				conn.RemoteAddr(), err)
 			return
 		}
 		n, err := conn.Read(buf[:header.Length])
 		if err != nil {
-			warn.Printf("failed to read payload from client %s\n",
+			proxy_logger.DebugLog.Printf("failed to read payload from client %s\n",
 				conn.RemoteAddr())
 			return
 		}
@@ -167,29 +168,29 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		magic, handshake := buf[:4], buf[4:20] // blaze it
 		valid, err := bolt.ValidateMagic(magic)
 		if !valid {
-			warn.Fatal(err)
+			proxy_logger.DebugLog.Fatal(err)
 		}
 
 		// negotiate client & server side bolt versions
 		serverVersion := backend_server.Version().Bytes()
 		clientVersion, err := bolt.ValidateHandshake(handshake, serverVersion)
 		if err != nil {
-			warn.Fatal(err)
+			proxy_logger.DebugLog.Fatal(err)
 		}
 
 		// Complete Bolt handshake via WebSocket frame
 		frame := ws.NewBinaryFrame(clientVersion)
 		if err = ws.WriteFrame(conn, frame); err != nil {
-			warn.Fatal(err)
+			proxy_logger.DebugLog.Fatal(err)
 		}
-		info.Printf("Received2: %x", buf)
+		proxy_logger.InfoLog.Printf("Received2: %x", buf)
 
 		// Let there be Bolt-via-WebSockets!
-		info.Print("Bolt via websockets")
+		proxy_logger.InfoLog.Print("Bolt via websockets")
 		handleBoltConn(bolt.NewWsConn(conn), clientVersion, backend_server)
 	} else {
 		// not bolt, not http...something else?
-		info.Printf("client %s is speaking gibberish: %#v\n",
+		proxy_logger.InfoLog.Printf("client %s is speaking gibberish: %#v\n",
 			conn.RemoteAddr(), buf[:4])
 	}
 }
@@ -205,39 +206,39 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 	// Intercept HELLO message for authentication and hold onto it
 	// for use in backend authentication
 	var hello *bolt.Message
-	info.Printf("Version: %v\n", clientVersion)
-	info.Printf("Client: %v\n", client)
+	proxy_logger.InfoLog.Printf("Version: %v\n", clientVersion)
+	proxy_logger.InfoLog.Printf("Client: %v\n", client)
 	select {
 	case msg, ok := <-client.R():
 		if !ok {
-			warn.Println("failed to read expected Hello from client", msg, ok)
+			proxy_logger.DebugLog.Println("Failed to read expected Hello from client", msg, ok)
 			return
 		}
 		hello = msg
 	case <-time.After(30 * time.Second):
-		warn.Println("timed out waiting for client to auth")
+		proxy_logger.DebugLog.Println("Timed out waiting for client to auth")
 		return
 	}
-	logMessage("C->P", hello)
+	proxy_logger.LogMessage("C->P", hello)
 
 	if hello.T != bolt.HelloMsg {
-		debug.Println("expected HelloMsg, got:", hello.T)
+		proxy_logger.DebugLog.Println("Expected HelloMsg, got:", hello.T)
 		return
 	}
-	debug.Println("expected HelloMsg, got:", hello.T)
+	proxy_logger.DebugLog.Println("Expected HelloMsg, got:", hello.T)
 
 	bolt_conn, err := back.InitBoltConnection(hello.Data, "tcp")
 	if err != nil {
-		warn.Println(err)
+		proxy_logger.DebugLog.Println(err)
 		return
 	}
 
 	// TODO: this seems odd...move parser and version stuff to bolt pkg
 	v, _ := backend.ParseVersion(clientVersion)
-	info.Printf("authenticated client %s speaking %s to %s server\n",
+	proxy_logger.InfoLog.Printf("authenticated client %s speaking %s to %s server\n",
 		client, v, back.MainInstance().Host)
 	defer func() {
-		info.Printf("goodbye to client %s\n", client)
+		proxy_logger.InfoLog.Printf("goodbye to client %s\n", client)
 	}()
 
 	// TODO: Replace hardcoded Success message with dynamic one
@@ -252,10 +253,10 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 			0x8d, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64,
 			0x86, 0x62, 0x6f, 0x6c, 0x74, 0x2d, 0x34,
 			0x00, 0x00}}
-	logMessage("P->C", &success_msg)
+	proxy_logger.LogMessage("P->C", &success_msg)
 	err = client.WriteMessage(&success_msg)
 	if err != nil {
-		warn.Fatal(err)
+		proxy_logger.DebugLog.Fatal(err)
 	}
 
 	// Time to begin the client-side event loop!
@@ -271,19 +272,19 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 		case m, ok := <-client.R():
 			if ok {
 				msg = m
-				logMessage("C->P", msg)
+				proxy_logger.LogMessage("C->P", msg)
 			} else {
-				debug.Println("potential client hangup")
+				proxy_logger.DebugLog.Println("potential client hangup")
 				select {
 				case halt <- true:
-					debug.Println("client hangup, asking tx to halt")
+					proxy_logger.DebugLog.Println("client hangup, asking tx to halt")
 				default:
-					warn.Println("failed to send halt message to tx handler")
+					proxy_logger.DebugLog.Println("failed to send halt message to tx handler")
 				}
 				return
 			}
 		case <-time.After(time.Duration(MAX_IDLE_MINS) * time.Minute):
-			warn.Println("client idle timeout")
+			proxy_logger.DebugLog.Println("client idle timeout")
 			return
 		}
 
@@ -310,32 +311,32 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 
 		// XXX: This is a mess, but if we're starting a new transaction
 		// we need to find a new connection to switch to
-		debug.Printf("The incoming client message %v is manual: %t and startingTx: %t", msg.T, manualTx, startingTx)
+		proxy_logger.DebugLog.Printf("The incoming client message %v is manual: %t and startingTx: %t", msg.T, manualTx, startingTx)
 		if startingTx {
 			mode, _ := bolt.ValidateMode(msg.Data)
 
 			var n int
 			if msg.T == bolt.BeginMsg {
-				debug.Print("Debug begin MSG")
+				proxy_logger.DebugLog.Print("proxy_logger.DebugLog begin MSG")
 				_, _, err = bolt.ParseMap(msg.Data[4:])
 				if err != nil {
-					warn.Println(err)
+					proxy_logger.DebugLog.Println(err)
 					return
 				}
 			} else if msg.T == bolt.RunMsg {
-				debug.Print("Debug begin RUN")
+				proxy_logger.DebugLog.Print("proxy_logger.DebugLog begin RUN")
 				pos := 4
 				// query
 				_, n, err = bolt.ParseString(msg.Data[pos:])
 				if err != nil {
-					warn.Println(err)
+					proxy_logger.DebugLog.Println(err)
 					return
 				}
 				pos = pos + n
 				// query params
 				_, n, err = bolt.ParseMap(msg.Data[pos:])
 				if err != nil {
-					warn.Println(err)
+					proxy_logger.DebugLog.Println(err)
 					return
 				}
 				pos = pos + n
@@ -354,11 +355,11 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 				hosts = writers
 			}
 			if err != nil {
-				warn.Printf("Couldn't find host")
+				proxy_logger.DebugLog.Printf("Couldn't find host")
 			}
 
 			if len(hosts) < 1 {
-				warn.Println("No hosts")
+				proxy_logger.DebugLog.Println("No hosts")
 				// TODO: return FailureMsg???
 				return
 			}
@@ -369,12 +370,12 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 			if server != nil {
 				select {
 				case halt <- true:
-					debug.Println("...asking current tx handler to halt")
+					proxy_logger.DebugLog.Println("...asking current tx handler to halt")
 					select {
 					case <-ack:
-						debug.Println("tx handler ack'd stop")
+						proxy_logger.DebugLog.Println("tx handler ack'd stop")
 					case <-time.After(5 * time.Second):
-						warn.Println("!!! timeout waiting for ack from tx handler")
+						proxy_logger.DebugLog.Println("Timeout waiting for ack from tx handler")
 					}
 				default:
 					// this shouldn't happen!
@@ -386,10 +387,10 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 			// ok := false
 			server = bolt_conn
 			// if !ok {
-			// 	warn.Println("no established connection for host", host)
+			// 	proxy_logger.DebugLog.("no established connection for host", host)
 			// 	return
 			// }
-			debug.Printf("grabbed conn for %s-access to db %s on host %s\n", mode, "ladida", host)
+			proxy_logger.DebugLog.Printf("grabbed conn for %s-access to db %s on host %s\n", mode, "ladida", host)
 
 			// TODO: refactor channel handling...probably have handleTx() return new ones
 			// instead of reusing the same ones. If we don't create new ones, there could
@@ -409,7 +410,7 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 				// TODO: figure out best way to handle failed writes
 				panic(err)
 			}
-			logMessage("P->S", msg)
+			proxy_logger.LogMessage("P->S", msg)
 		} else {
 			// we have no connection since there's no tx...
 			// handle only specific, simple messages

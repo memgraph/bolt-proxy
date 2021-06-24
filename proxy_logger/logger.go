@@ -55,6 +55,6 @@ func LogMessage(who string, msg *bolt.Message) {
 
 func LogMessages(who string, messages []*bolt.Message) {
 	for _, msg := range messages {
-		logMessage(who, msg)
+		LogMessage(who, msg)
 	}
 }
