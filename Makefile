@@ -7,7 +7,7 @@ bolt-proxy: clean
 	go build -o bolt-proxy proxy.go
 
 test:
-	go test tests/...
+	go test ./...
 
 clean:
 	go clean

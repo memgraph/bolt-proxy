@@ -4,25 +4,28 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/url"
 
 	"github.com/memgraph/bolt-proxy/bolt"
 )
 
-type Backend struct {
-	monitor  *Monitor
-	tls      bool
-	log      *log.Logger
-	main_uri *url.URL
-	// map of principals -> hosts -> connections
-	connectionPool map[string]map[string]bolt.BoltConn
-	// routingCache   map[string]RoutingTable
-	// info           ClusterInfo
+type Parameters struct {
+	debugMode          bool
+	bindOn             string
+	proxyTo            string
+	username, password string
+	certFile, keyFile  string
 }
 
-func NewBackend(logger *log.Logger, username, password string, uri string, hosts ...string) (*Backend, error) {
+type Backend struct {
+	monitor        *Monitor
+	tls            bool
+	main_uri       *url.URL
+	connectionPool map[string]map[string]bolt.BoltConn
+}
+
+func NewBackend(username, password, uri, main_instance string) (*Backend, error) {
 	tls := false
 	u, err := url.Parse(uri)
 	if err != nil {
@@ -34,10 +37,10 @@ func NewBackend(logger *log.Logger, username, password string, uri string, hosts
 	case "bolt", "neo4j":
 		// ok
 	default:
-		return nil, errors.New("invalid neo4j connection scheme")
+		return nil, errors.New("Invalid bolt connection scheme")
 	}
 
-	monitor, err := NewMonitor(username, password, uri, hosts...)
+	monitor, err := NewMonitor(username, password, uri, main_instance)
 	if err != nil {
 		return nil, err
 	}
@@ -45,11 +48,8 @@ func NewBackend(logger *log.Logger, username, password string, uri string, hosts
 	return &Backend{
 		monitor:        monitor,
 		tls:            tls,
-		log:            logger,
 		main_uri:       u,
 		connectionPool: make(map[string]map[string]bolt.BoltConn),
-		// routingCache:   make(map[string]RoutingTable),
-		// info:           <-monitor.Info,
 	}, nil
 }
 
