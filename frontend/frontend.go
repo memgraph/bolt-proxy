@@ -88,7 +88,7 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		proxy_logger.DebugLog.Println("Bad connection from", conn.RemoteAddr())
 		return
 	}
-	if bytes.Equal(buf[:4], []byte{0x60, 0x60, 0xb0, 0x17}) {
+	if bytes.Equal(buf[:4], bolt.BoltSignature[:]) {
 		// First case: we have a direct bolt client connection
 		n, err := conn.Read(buf[:20])
 		if err != nil {
@@ -110,7 +110,7 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		proxy_logger.InfoLog.Println("Regular bolt")
 		handleBoltConn(bolt.NewDirectConn(conn), clientVersion, backend_server)
 
-	} else if bytes.Equal(buf[:4], []byte{0x47, 0x45, 0x54, 0x20}) {
+	} else if bytes.Equal(buf[:4], bolt.HttpSignature[:]) {
 		// Second case, we have an HTTP connection that might just
 		// be a WebSocket upgrade OR a health check.
 
