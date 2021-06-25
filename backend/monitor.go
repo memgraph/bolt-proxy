@@ -1,48 +1,18 @@
 package backend
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 
+	"github.com/memgraph/bolt-proxy/bolt"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
 
 type Monitor struct {
 	driver  *neo4j.Driver
-	version Version
+	version bolt.Version
 	Host    string
-}
-
-type Version struct {
-	Major, Minor, Patch uint8
-}
-
-func ParseVersion(buf []byte) (Version, error) {
-	if len(buf) < 4 {
-		return Version{}, errors.New("buffer too short (< 4)")
-	}
-
-	version := Version{}
-	version.Major = uint8(buf[3])
-	version.Minor = uint8(buf[2])
-	version.Patch = uint8(buf[1])
-	return version, nil
-}
-
-func (v Version) String() string {
-	return fmt.Sprintf("Bolt{major: %d, minor: %d, patch: %d}",
-		v.Major,
-		v.Minor,
-		v.Patch)
-}
-
-func (v Version) Bytes() []byte {
-	return []byte{
-		0x00, 0x00,
-		v.Minor, v.Major,
-	}
 }
 
 // Our default Driver configuration provides:
@@ -79,7 +49,7 @@ func NewMonitor(user, password, uri string, hosts ...string) (*Monitor, error) {
 		return nil, err
 	}
 
-	version := Version{1, 0, 0}
+	version := bolt.Version{1, 0, 0}
 
 	// Get the cluster members and ttl details
 	u, err := url.Parse(uri)

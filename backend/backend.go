@@ -54,7 +54,7 @@ func NewBackend(username, password, uri string, hosts ...string) (*Backend, erro
 	}, nil
 }
 
-func (b *Backend) Version() Version {
+func (b *Backend) Version() bolt.Version {
 	return b.monitor.version
 }
 

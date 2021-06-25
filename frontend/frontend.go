@@ -2,71 +2,15 @@ package frontend
 
 import (
 	"bytes"
-	"io"
 	"net"
 	"time"
 
-	"github.com/gobwas/ws"
 	"github.com/memgraph/bolt-proxy/backend"
 	"github.com/memgraph/bolt-proxy/bolt"
-	"github.com/memgraph/bolt-proxy/health"
 	"github.com/memgraph/bolt-proxy/proxy_logger"
 )
 
 const MAX_IDLE_MINS int = 30
-
-// Primary Transaction server-side event handler, collecting Messages from
-// the backend Bolt server and writing them to the given client.
-//
-// Since this should be running async to process server Messages as they
-// arrive, two channels are provided for signaling:
-//
-//  ack: used for letting this handler to signal that it's completed and
-//       stopping execution, basically a way to confirm the requested halt
-//
-// halt: used by an external routine to request this handler to cleanly
-//       stop execution
-//
-func handleTx(client, server bolt.BoltConn, ack chan<- bool, halt <-chan bool) {
-	finished := false
-
-	for !finished {
-		select {
-		case msg, ok := <-server.R():
-			if ok {
-				// logMessage("P<-S", msg)
-				err := client.WriteMessage(msg)
-				if err != nil {
-					panic(err)
-				}
-				proxy_logger.LogMessage("C<-P", msg)
-
-				// if know the server side is saying goodbye,
-				// we abort the loop
-				if msg.T == bolt.GoodbyeMsg {
-					finished = true
-				}
-			} else {
-				proxy_logger.DebugLog.Println("potential server hangup")
-				finished = true
-			}
-
-		case <-halt:
-			finished = true
-
-		case <-time.After(time.Duration(MAX_IDLE_MINS) * time.Minute):
-			proxy_logger.DebugLog.Println("Timeout reading server!")
-			finished = true
-		}
-	}
-
-	select {
-	case ack <- true:
-		proxy_logger.DebugLog.Println("Tx handler stop ACK sent")
-	default:
-		proxy_logger.DebugLog.Println("Couldn't put value in ack channel?!")
-	}
-}
 
 // Identify if a new connection is valid Bolt or Bolt-over-Websocket
 // connection based on handshakes.
@@ -111,86 +55,26 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		handleBoltConn(bolt.NewDirectConn(conn), clientVersion, backend_server)
 
 	} else if bytes.Equal(buf[:4], bolt.HttpSignature[:]) {
-		// Second case, we have an HTTP connection that might just
-		// be a WebSocket upgrade OR a health check.
-
+		// Second case, we have an HTTP which only support health checks.
 		// Read the rest of the request
 		data, err = conn.Read(buf[4:])
 		if err != nil {
-			proxy_logger.DebugLog.Printf("failed reading rest of GET request: %s\n", err)
+			proxy_logger.DebugLog.Printf("Failed reading rest of GET request: %s\n", err)
 			return
 		}
 
 		// Health check, maybe? If so, handle and bail.
-		if health.IsHealthCheck(buf[:data+4]) {
-			err = health.HandleHealthCheck(conn, buf[:data+4])
+		if IsHealthCheck(buf[:data+4]) {
+			err = HandleHealthCheck(conn, buf[:data+4])
 			if err != nil {
 				proxy_logger.DebugLog.Println(err)
 			}
 			return
 		}
 
-		// Build something implementing the io.ReadWriter interface
-		// to pass to the upgrader routine
-		iobuf := bytes.NewBuffer(buf[:data+4])
-		_, err := ws.Upgrade(iobuf)
-		if err != nil {
-			proxy_logger.DebugLog.Printf("Failed to upgrade websocket client %s: %s\n",
-				conn.RemoteAddr(), err)
-			return
-		}
-		// Relay the upgrade response
-		_, err = io.Copy(conn, iobuf)
-		if err != nil {
-			proxy_logger.DebugLog.Printf("failed to copy upgrade to client %s\n",
-				conn.RemoteAddr())
-			return
-		}
-
-		// After upgrade, we should get a WebSocket message with header
-		header, err := ws.ReadHeader(conn)
-		if err != nil {
-			proxy_logger.DebugLog.Printf("failed to read ws header from client %s: %s\n",
-				conn.RemoteAddr(), err)
-			return
-		}
-		n, err := conn.Read(buf[:header.Length])
-		if err != nil {
-			proxy_logger.DebugLog.Printf("failed to read payload from client %s\n",
-				conn.RemoteAddr())
-			return
-		}
-		if header.Masked {
-			ws.Cipher(buf[:n], header.Mask, 0)
-		}
-
-		// We expect we can now do the initial Bolt handshake
-		magic, handshake := buf[:4], buf[4:20] // blaze it
-		valid, err := bolt.ValidateMagic(magic)
-		if !valid {
-			proxy_logger.DebugLog.Fatal(err)
-		}
-
-		// negotiate client & server side bolt versions
-		serverVersion := backend_server.Version().Bytes()
-		clientVersion, err := bolt.ValidateHandshake(handshake, serverVersion)
-		if err != nil {
-			proxy_logger.DebugLog.Fatal(err)
-		}
-
-		// Complete Bolt handshake via WebSocket frame
-		frame := ws.NewBinaryFrame(clientVersion)
-		if err = ws.WriteFrame(conn, frame); err != nil {
-			proxy_logger.DebugLog.Fatal(err)
-		}
-		proxy_logger.InfoLog.Printf("Received2: %x", buf)
-
-		// Let there be Bolt-via-WebSockets!
-		proxy_logger.InfoLog.Print("Bolt via websockets")
-		handleBoltConn(bolt.NewWsConn(conn), clientVersion, backend_server)
 	} else {
 		// not bolt, not http...something else?
-		proxy_logger.InfoLog.Printf("client %s is speaking gibberish: %#v\n",
+		proxy_logger.InfoLog.Printf("Client %s is speaking gibberish: %#v\n",
 			conn.RemoteAddr(), buf[:4])
 	}
 }
@@ -233,8 +117,7 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 		return
 	}
 
-	// TODO: this seems odd...move parser and version stuff to bolt pkg
-	v, _ := backend.ParseVersion(clientVersion)
+	v, _ := bolt.ParseVersion(clientVersion)
 	proxy_logger.InfoLog.Printf("authenticated client %s speaking %s to %s server\n",
 		client, v, back.MainInstance().Host)
 	defer func() {
@@ -433,5 +316,58 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 				return
 			}
 		}
+	}
+}
+
+// Primary Transaction server-side event handler, collecting Messages from
+// the backend Bolt server and writing them to the given client.
+//
+// Since this should be running async to process server Messages as they
+// arrive, two channels are provided for signaling:
+//
+//  ack: used for letting this handler to signal that it's completed and
+//       stopping execution, basically a way to confirm the requested halt
+//
+// halt: used by an external routine to request this handler to cleanly
+//       stop execution
+//
+func handleTx(client, server bolt.BoltConn, ack chan<- bool, halt <-chan bool) {
+	finished := false
+
+	for !finished {
+		select {
+		case msg, ok := <-server.R():
+			if ok {
+				// logMessage("P<-S", msg)
+				err := client.WriteMessage(msg)
+				if err != nil {
+					panic(err)
+				}
+				proxy_logger.LogMessage("C<-P", msg)
+
+				// if know the server side is saying goodbye,
+				// we abort the loop
+				if msg.T == bolt.GoodbyeMsg {
+					finished = true
+				}
+			} else {
+				proxy_logger.DebugLog.Println("potential server hangup")
+				finished = true
+			}
+
+		case <-halt:
+			finished = true
+
+		case <-time.After(time.Duration(MAX_IDLE_MINS) * time.Minute):
+			proxy_logger.DebugLog.Println("Timeout reading server!")
+			finished = true
+		}
+	}
+
+	select {
+	case ack <- true:
+		proxy_logger.DebugLog.Println("Tx handler stop ACK sent")
+	default:
+		proxy_logger.DebugLog.Println("Couldn't put value in ack channel?!")
 	}
 }
