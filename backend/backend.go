@@ -63,7 +63,6 @@ func (b *Backend) MainInstance() *url.URL {
 }
 
 func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltConn, error) {
-	bolt_signature := []byte{0x60, 0x60, 0xb0, 0x17}
 	backend_version := b.Version().Bytes()
 	address := b.monitor.Host
 	useTls := b.tls
@@ -83,7 +82,7 @@ func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltCon
 		return nil, err
 	}
 
-	handshake := append(bolt_signature, backend_version...)
+	handshake := append(bolt.BoltSignature[:], backend_version...)
 	handshake = append(handshake, []byte{
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00,

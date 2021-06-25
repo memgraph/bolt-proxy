@@ -80,16 +80,16 @@ func main() {
 	}
 
 	// ---------- BACK END
-	proxy_logger.InfoLog.Println("starting bolt-proxy backend")
+	proxy_logger.InfoLog.Println("Starting bolt-proxy backend")
 	backend, err := backend.NewBackend(proxy_params.username, proxy_params.password, proxy_params.proxyTo)
 	if err != nil {
 		proxy_logger.WarnLog.Fatal(err)
 	}
-	proxy_logger.InfoLog.Println("connected to backend", proxy_params.proxyTo)
-	proxy_logger.InfoLog.Printf("found backend version %s\n", backend.Version())
+	proxy_logger.InfoLog.Println("Connected to backend", proxy_params.proxyTo)
+	proxy_logger.InfoLog.Printf("Found backend version %s\n", backend.Version())
 
 	// ---------- FRONT END
-	proxy_logger.InfoLog.Println("starting bolt-proxy frontend")
+	proxy_logger.InfoLog.Println("Starting bolt-proxy frontend")
 
 	var listener net.Listener
 	if proxy_params.certFile == "" || proxy_params.keyFile == "" {
@@ -98,7 +98,7 @@ func main() {
 		if err != nil {
 			proxy_logger.WarnLog.Fatal(err)
 		}
-		proxy_logger.InfoLog.Printf("listening on %s\n", proxy_params.bindOn)
+		proxy_logger.InfoLog.Printf("Listening on %s\n", proxy_params.bindOn)
 	} else {
 		// tls
 		cert, err := tls.LoadX509KeyPair(proxy_params.certFile, proxy_params.keyFile)
