@@ -111,7 +111,7 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 	}
 	proxy_logger.DebugLog.Println("Expected HelloMsg, got:", hello.T)
 
-	bolt_conn, err := back.InitBoltConnection(hello.Data, "tcp")
+	server_conn, err := back.InitBoltConnection(hello.Data, "tcp")
 	if err != nil {
 		proxy_logger.DebugLog.Println(err)
 		return
@@ -142,13 +142,19 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 		proxy_logger.DebugLog.Fatal(err)
 	}
 
+	proxyListen(client, server_conn, back)
+}
+
+func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backend) {
 	// Time to begin the client-side event loop!
-	startingTx := false
-	manualTx := false
+	var (
+		startingTx bool = false
+		manualTx   bool = false
+		err        error
+	)
 	halt := make(chan bool, 1)
 	ack := make(chan bool, 1)
 
-	var server bolt.BoltConn
 	for {
 		var msg *bolt.Message
 		select {
@@ -266,13 +272,6 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 				}
 			}
 
-			// Grab our host from our local pool
-			// ok := false
-			server = bolt_conn
-			// if !ok {
-			// 	proxy_logger.DebugLog.("no established connection for host", host)
-			// 	return
-			// }
 			proxy_logger.DebugLog.Printf("grabbed conn for %s-access to db %s on host %s\n", mode, "ladida", host)
 
 			// TODO: refactor channel handling...probably have handleTx() return new ones
@@ -282,7 +281,7 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 			ack = make(chan bool, 1)
 
 			// kick off a new tx handler routine
-			go handleTx(client, bolt_conn, ack, halt)
+			go handleTx(client, server, ack, halt)
 			startingTx = false
 		}
 
