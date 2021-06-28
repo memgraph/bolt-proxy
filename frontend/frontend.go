@@ -12,6 +12,18 @@ import (
 
 const MAX_IDLE_MINS int = 30
 
+type CommunicationChannels struct {
+	halt chan bool
+	ack  chan bool
+}
+
+func newCommChans(size int) CommunicationChannels {
+	return CommunicationChannels{
+		halt: make(chan bool, size),
+		ack:  make(chan bool, size),
+	}
+}
+
 // Identify if a new connection is valid Bolt or Bolt-over-Websocket
 // connection based on handshakes.
 //
@@ -81,11 +93,6 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 
 // Primary Transaction client-side event handler, collecting Messages from
 // the Bolt client and finding ways to switch them to the proper backend.
-//
-// The event loop...
-//
-// TOOD: this logic should be split out between the authentication and the
-// event loop. For now, this does both.
 func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Backend) {
 	// Intercept HELLO message for authentication and hold onto it
 	// for use in backend authentication
@@ -145,15 +152,14 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 	proxyListen(client, server_conn, back)
 }
 
+// Time to begin the client-side event loop!
 func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backend) {
-	// Time to begin the client-side event loop!
 	var (
 		startingTx bool = false
 		manualTx   bool = false
 		err        error
 	)
-	halt := make(chan bool, 1)
-	ack := make(chan bool, 1)
+	comm_chans := newCommChans(1)
 
 	for {
 		var msg *bolt.Message
@@ -165,7 +171,7 @@ func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backe
 			} else {
 				proxy_logger.DebugLog.Println("potential client hangup")
 				select {
-				case halt <- true:
+				case comm_chans.halt <- true:
 					proxy_logger.DebugLog.Println("client hangup, asking tx to halt")
 				default:
 					proxy_logger.DebugLog.Println("failed to send halt message to tx handler")
@@ -202,86 +208,11 @@ func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backe
 		// we need to find a new connection to switch to
 		proxy_logger.DebugLog.Printf("The incoming client message %v is manual: %t and startingTx: %t", msg.T, manualTx, startingTx)
 		if startingTx {
-			mode, _ := bolt.ValidateMode(msg.Data)
-
-			var n int
-			if msg.T == bolt.BeginMsg {
-				proxy_logger.DebugLog.Print("proxy_logger.DebugLog begin MSG")
-				_, _, err = bolt.ParseMap(msg.Data[4:])
-				if err != nil {
-					proxy_logger.DebugLog.Println(err)
-					return
-				}
-			} else if msg.T == bolt.RunMsg {
-				proxy_logger.DebugLog.Print("proxy_logger.DebugLog begin RUN")
-				pos := 4
-				// query
-				_, n, err = bolt.ParseString(msg.Data[pos:])
-				if err != nil {
-					proxy_logger.DebugLog.Println(err)
-					return
-				}
-				pos = pos + n
-				// query params
-				_, n, err = bolt.ParseMap(msg.Data[pos:])
-				if err != nil {
-					proxy_logger.DebugLog.Println(err)
-					return
-				}
-				pos = pos + n
-			} else {
-				panic("shouldn't be starting a tx without a Begin or Run message")
-			}
-
-			// Todo Memgraph has no writers and readers one cluster has only one main
-			readers := []string{back.MainInstance().Host}
-			writers := []string{back.MainInstance().Host}
-
-			var hosts []string
-			if mode == bolt.ReadMode {
-				hosts = readers
-			} else {
-				hosts = writers
-			}
-			if err != nil {
-				proxy_logger.DebugLog.Printf("Couldn't find host")
-			}
-
-			if len(hosts) < 1 {
-				proxy_logger.DebugLog.Println("No hosts")
-				// TODO: return FailureMsg???
-				return
-			}
-			host := hosts[0]
-
-			// Are we already using a host? If so try to stop the
-			// current tx handler before we create a new one
-			if server != nil {
-				select {
-				case halt <- true:
-					proxy_logger.DebugLog.Println("...asking current tx handler to halt")
-					select {
-					case <-ack:
-						proxy_logger.DebugLog.Println("tx handler ack'd stop")
-					case <-time.After(5 * time.Second):
-						proxy_logger.DebugLog.Println("Timeout waiting for ack from tx handler")
-					}
-				default:
-					// this shouldn't happen!
-					panic("couldn't send halt to tx handler!")
-				}
-			}
-
-			proxy_logger.DebugLog.Printf("grabbed conn for %s-access to db %s on host %s\n", mode, "ladida", host)
-
-			// TODO: refactor channel handling...probably have handleTx() return new ones
-			// instead of reusing the same ones. If we don't create new ones, there could
-			// be lingering halt/ack messages. :-(
-			halt = make(chan bool, 1)
-			ack = make(chan bool, 1)
+			startNewTx(msg, server, back, &comm_chans)
+			comm_chans = newCommChans(1)
 
 			// kick off a new tx handler routine
-			go handleTx(client, server, ack, halt)
+			go handleClientServerCommunication(client, server, &comm_chans)
 			startingTx = false
 		}
 
@@ -318,6 +249,66 @@ func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backe
 	}
 }
 
+func startNewTx(msg *bolt.Message, server bolt.BoltConn, back *backend.Backend, comm_chans *CommunicationChannels) {
+	var err error
+	// mode, _ := bolt.ValidateMode(msg.Data)
+	// proxy_logger.InfoLog.Printf("Mode: %v", mode)
+
+	var n int
+	if msg.T == bolt.BeginMsg {
+		proxy_logger.DebugLog.Print("proxy_logger.DebugLog begin MSG")
+		_, _, err = bolt.ParseMap(msg.Data[4:])
+		if err != nil {
+			proxy_logger.DebugLog.Println(err)
+			return
+		}
+	} else if msg.T == bolt.RunMsg {
+		proxy_logger.DebugLog.Print("proxy_logger.DebugLog begin RUN")
+		pos := 4
+		// query
+		_, n, err = bolt.ParseString(msg.Data[pos:])
+		if err != nil {
+			proxy_logger.DebugLog.Println(err)
+			return
+		}
+		pos = pos + n
+		// query params
+		_, n, err = bolt.ParseMap(msg.Data[pos:])
+		if err != nil {
+			proxy_logger.DebugLog.Println(err)
+			return
+		}
+		pos = pos + n
+	} else {
+		panic("shouldn't be starting a tx without a Begin or Run message")
+	}
+
+	// Todo Memgraph has no writers and readers one cluster has only one main
+	// readers := []string{back.MainInstance().Host}
+	// writers := []string{back.MainInstance().Host}
+	host := back.MainInstance().Host
+
+	// Are we already using a host? If so try to stop the
+	// current tx handler before we create a new one
+	if server != nil {
+		select {
+		case comm_chans.halt <- true:
+			proxy_logger.DebugLog.Println("...asking current tx handler to halt")
+			select {
+			case <-comm_chans.ack:
+				proxy_logger.DebugLog.Println("Tx handler ack'd stop")
+			case <-time.After(5 * time.Second):
+				proxy_logger.DebugLog.Println("Timeout waiting for ack from tx handler")
+			}
+		default:
+			// this shouldn't happen!
+			panic("Couldn't send halt to tx handler!")
+		}
+	}
+
+	proxy_logger.DebugLog.Printf("Grabbed conn for access to memgraph on host %s\n", host)
+}
+
 // Primary Transaction server-side event handler, collecting Messages from
 // the backend Bolt server and writing them to the given client.
 //
@@ -330,14 +321,14 @@ func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backe
 // halt: used by an external routine to request this handler to cleanly
 //       stop execution
 //
-func handleTx(client, server bolt.BoltConn, ack chan<- bool, halt <-chan bool) {
+func handleClientServerCommunication(client, server bolt.BoltConn, comm_chans *CommunicationChannels) {
 	finished := false
 
 	for !finished {
 		select {
 		case msg, ok := <-server.R():
 			if ok {
-				// logMessage("P<-S", msg)
+				proxy_logger.LogMessage("P<-S", msg)
 				err := client.WriteMessage(msg)
 				if err != nil {
 					panic(err)
@@ -354,7 +345,7 @@ func handleTx(client, server bolt.BoltConn, ack chan<- bool, halt <-chan bool) {
 				finished = true
 			}
 
-		case <-halt:
+		case <-comm_chans.halt:
 			finished = true
 
 		case <-time.After(time.Duration(MAX_IDLE_MINS) * time.Minute):
@@ -364,7 +355,7 @@ func handleTx(client, server bolt.BoltConn, ack chan<- bool, halt <-chan bool) {
 	}
 
 	select {
-	case ack <- true:
+	case comm_chans.ack <- true:
 		proxy_logger.DebugLog.Println("Tx handler stop ACK sent")
 	default:
 		proxy_logger.DebugLog.Println("Couldn't put value in ack channel?!")
