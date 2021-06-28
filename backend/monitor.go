@@ -40,7 +40,7 @@ func newConfigurer(hosts []string) func(c *neo4j.Config) {
 	}
 }
 
-// The Monitor serer to provide the data about the used backend service (Memgraph or Neo4j)
+// The Monitor server to provide the data about the used backend service (Memgraph or Neo4j)
 func NewMonitor(user, password, uri string, hosts ...string) (*Monitor, error) {
 	// Try immediately to connect to Neo4j
 	auth := neo4j.BasicAuth(user, password, "")

@@ -242,7 +242,6 @@ func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backe
 					},
 				})
 			case bolt.GoodbyeMsg:
-				// bye!
 				return
 			}
 		}
@@ -251,8 +250,6 @@ func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backe
 
 func startNewTx(msg *bolt.Message, server bolt.BoltConn, back *backend.Backend, comm_chans *CommunicationChannels) {
 	var err error
-	// mode, _ := bolt.ValidateMode(msg.Data)
-	// proxy_logger.InfoLog.Printf("Mode: %v", mode)
 
 	var n int
 	if msg.T == bolt.BeginMsg {
@@ -283,9 +280,7 @@ func startNewTx(msg *bolt.Message, server bolt.BoltConn, back *backend.Backend, 
 		panic("shouldn't be starting a tx without a Begin or Run message")
 	}
 
-	// Todo Memgraph has no writers and readers one cluster has only one main
-	// readers := []string{back.MainInstance().Host}
-	// writers := []string{back.MainInstance().Host}
+	// TODO Memgraph has no writers and readers one cluster has only one main
 	host := back.MainInstance().Host
 
 	// Are we already using a host? If so try to stop the

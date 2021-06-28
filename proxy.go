@@ -7,10 +7,6 @@ import (
 	"net"
 	"os"
 
-	// debuggin' -- used for runtime profiling/debugging
-
-	_ "net/http/pprof"
-
 	"github.com/memgraph/bolt-proxy/backend"
 	"github.com/memgraph/bolt-proxy/frontend"
 	"github.com/memgraph/bolt-proxy/proxy_logger"
