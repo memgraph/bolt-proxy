@@ -12,7 +12,7 @@ import (
 type Monitor struct {
 	driver  *neo4j.Driver
 	version bolt.Version
-	Host    string
+	host    string
 }
 
 // Our default Driver configuration provides:
@@ -64,7 +64,7 @@ func NewMonitor(user, password, uri string, hosts ...string) (*Monitor, error) {
 	monitor := Monitor{
 		driver:  &driver,
 		version: version,
-		Host:    host,
+		host:    host,
 	}
 
 	return &monitor, nil

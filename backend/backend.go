@@ -64,7 +64,7 @@ func (b *Backend) MainInstance() *url.URL {
 
 func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltConn, error) {
 	backend_version := b.Version().Bytes()
-	address := b.monitor.Host
+	address := b.monitor.host
 	useTls := b.tls
 	var (
 		conn net.Conn
@@ -174,10 +174,10 @@ func (b *Backend) Authenticate(hello *bolt.Message) (bool, error) {
 	}
 	proxy_logger.DebugLog.Println("found principal:", principal)
 
-	defaultHost := b.monitor.Host
+	defaultHost := b.monitor.host
 
-	proxy_logger.DebugLog.Printf("Conencting to %v %v", b.main_uri.Scheme, b.monitor.Host)
-	conn, err := net.Dial("tcp", b.monitor.Host)
+	proxy_logger.DebugLog.Printf("Conencting to %v %v", b.main_uri.Scheme, b.monitor.host)
+	conn, err := net.Dial("tcp", b.monitor.host)
 
 	// // Ok, now to get the rest
 	conns := make(map[string]bolt.BoltConn, 1)
