@@ -3,11 +3,11 @@
 KEYGEN = openssl req -x509 -newkey rsa:4096 -keyout key.pem \
 		-out cert.pem -days 30 -nodes -subj '/CN=localhost'
 
-bolt-proxy: clean
+build: clean
 	go build -o bolt-proxy proxy.go
 
 test:
-	go test tests/...
+	go test ./...
 
 clean:
 	go clean

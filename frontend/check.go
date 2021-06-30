@@ -1,4 +1,4 @@
-package health
+package frontend
 
 import (
 	"bufio"

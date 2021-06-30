@@ -12,6 +12,10 @@ type Message struct {
 	Data []byte
 }
 
+type Version struct {
+	Major, Minor, Patch uint8
+}
+
 type Type string
 
 const (
@@ -504,4 +508,30 @@ func TinyMapToBytes(tinymap map[string]interface{}) ([]byte, error) {
 		pos = pos + len(raw)
 	}
 	return buf[:pos], nil
+}
+
+func ParseVersion(buf []byte) (Version, error) {
+	if len(buf) < 4 {
+		return Version{}, errors.New("buffer too short (< 4)")
+	}
+
+	version := Version{}
+	version.Major = uint8(buf[3])
+	version.Minor = uint8(buf[2])
+	version.Patch = uint8(buf[1])
+	return version, nil
+}
+
+func (v Version) String() string {
+	return fmt.Sprintf("Bolt{major: %d, minor: %d, patch: %d}",
+		v.Major,
+		v.Minor,
+		v.Patch)
+}
+
+func (v Version) Bytes() []byte {
+	return []byte{
+		0x00, 0x00,
+		v.Minor, v.Major,
+	}
 }

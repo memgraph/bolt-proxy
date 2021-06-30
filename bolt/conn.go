@@ -42,6 +42,11 @@ type WsConn struct {
 	chunking bool
 }
 
+var (
+	BoltSignature = [...]byte{0x60, 0x60, 0xb0, 0x17}
+	HttpSignature = [...]byte{0x47, 0x45, 0x54, 0x20}
+)
+
 // Create a new Direct Bolt Connection that uses simple Read/Write calls
 // to transfer data.
 //
