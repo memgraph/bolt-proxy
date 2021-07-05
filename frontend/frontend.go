@@ -53,14 +53,18 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		}
 		// Make sure we try to use the version we're using the best
 		// version based on the backend server
-		serverVersion := backend_server.Version().Bytes()
-		clientVersion, err := bolt.ValidateHandshake(buf[:n], serverVersion)
+		server_version := backend_server.Version().Bytes()
+		proxy_logger.DebugLog.Printf("Received %b\n", buf[:n])
+		proxy_logger.DebugLog.Printf("Received %v\n", buf[:n])
+		clientVersion, err := bolt.ValidateHandshake(buf[:n], server_version)
 		if err != nil {
-			proxy_logger.DebugLog.Fatal(err)
+			proxy_logger.WarnLog.Printf("err occurred during handshake: %v\n", err)
+			return
 		}
 		_, err = conn.Write(clientVersion)
 		if err != nil {
-			proxy_logger.DebugLog.Fatal(err)
+			proxy_logger.WarnLog.Printf("err occurred version negotiation: %v\n", err)
+			return
 		}
 		// regular bolt
 		proxy_logger.InfoLog.Println("Regular bolt")
