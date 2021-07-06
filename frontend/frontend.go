@@ -32,7 +32,7 @@ func newCommChans(size int) CommunicationChannels {
 // a client handler
 func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 	defer func() {
-		proxy_logger.DebugLog.Printf("Closing client connection from %s\n",
+		proxy_logger.DebugLog.Printf("closing client connection from %s\n",
 			conn.RemoteAddr())
 		conn.Close()
 	}()
@@ -42,23 +42,23 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 
 	data, err := conn.Read(buf[:4])
 	if err != nil || data != 4 {
-		proxy_logger.DebugLog.Println("Bad connection from", conn.RemoteAddr())
+		proxy_logger.DebugLog.Println("bad connection from", conn.RemoteAddr())
 		return
 	}
 	if bytes.Equal(buf[:4], bolt.BoltSignature[:]) {
 		// First case: we have a direct bolt client connection
 		handshake := make([]byte, 16)
 		n, err := io.ReadFull(conn, handshake)
-		proxy_logger.DebugLog.Printf("Read %v number of bytes\n", n)
+		proxy_logger.DebugLog.Printf("read %v number of bytes\n", n)
 		if err != nil {
-			proxy_logger.DebugLog.Println("Error peeking at connection from", conn.RemoteAddr())
-			proxy_logger.DebugLog.Printf("Error is %v and size is %v\n", err, n)
+			proxy_logger.DebugLog.Println("error peeking at connection from", conn.RemoteAddr())
+			proxy_logger.DebugLog.Printf("error is %v and size is %v\n", err, n)
 			return
 		}
 		// Make sure we try to use the version we're using the best
 		// version based on the backend server
 		server_version := backend_server.Version().Bytes()
-		proxy_logger.DebugLog.Printf("Received %v\n", handshake)
+		proxy_logger.DebugLog.Printf("received %v\n", handshake)
 		clientVersion, err := bolt.ValidateHandshake(handshake, server_version)
 		if err != nil {
 			proxy_logger.WarnLog.Printf("err occurred during handshake: %v\n", err)
@@ -70,7 +70,7 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 			return
 		}
 		// regular bolt
-		proxy_logger.InfoLog.Println("Regular bolt")
+		proxy_logger.InfoLog.Println("regular bolt")
 		handleBoltConn(bolt.NewDirectConn(conn), clientVersion, backend_server)
 
 	} else if bytes.Equal(buf[:4], bolt.HttpSignature[:]) {
@@ -78,7 +78,7 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		// Read the rest of the request
 		n, err := conn.Read(buf[4:])
 		if err != nil {
-			proxy_logger.DebugLog.Printf("Failed reading rest of GET request: %s\n", err)
+			proxy_logger.DebugLog.Printf("failed reading rest of GET request: %s\n", err)
 			return
 		}
 
@@ -93,7 +93,7 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 
 	} else {
 		// not bolt, not http...something else?
-		proxy_logger.InfoLog.Printf("Client %s is speaking gibberish: %#v\n",
+		proxy_logger.InfoLog.Printf("client %s is speaking gibberish: %#v\n",
 			conn.RemoteAddr(), buf[:4])
 	}
 }
@@ -104,26 +104,26 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 	// Intercept HELLO message for authentication and hold onto it
 	// for use in backend authentication
 	var hello *bolt.Message
-	proxy_logger.InfoLog.Printf("Version: %v\n", clientVersion)
-	proxy_logger.InfoLog.Printf("Client: %v\n", client)
+	proxy_logger.InfoLog.Printf("version: %v\n", clientVersion)
+	proxy_logger.InfoLog.Printf("client: %v\n", client)
 	select {
 	case msg, ok := <-client.R():
 		if !ok {
-			proxy_logger.DebugLog.Println("Failed to read expected Hello from client", msg, ok)
+			proxy_logger.DebugLog.Println("failed to read expected Hello from client", msg, ok)
 			return
 		}
 		hello = msg
 	case <-time.After(30 * time.Second):
-		proxy_logger.DebugLog.Println("Timed out waiting for client to auth")
+		proxy_logger.DebugLog.Println("timed out waiting for client to auth")
 		return
 	}
 	proxy_logger.LogMessage("C->P", hello)
 
 	if hello.T != bolt.HelloMsg {
-		proxy_logger.DebugLog.Println("Expected HelloMsg, got:", hello.T)
+		proxy_logger.DebugLog.Println("expected HelloMsg, got:", hello.T)
 		return
 	}
-	proxy_logger.DebugLog.Println("Expected HelloMsg, got:", hello.T)
+	proxy_logger.DebugLog.Println("expected HelloMsg, got:", hello.T)
 
 	server_conn, err := back.InitBoltConnection(hello.Data, "tcp")
 	if err != nil {
@@ -213,7 +213,7 @@ func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backe
 
 		// XXX: This is a mess, but if we're starting a new transaction
 		// we need to find a new connection to switch to
-		proxy_logger.DebugLog.Printf("The incoming client message %v is manual: %t and startingTx: %t", msg.T, manualTx, startingTx)
+		proxy_logger.DebugLog.Printf("the incoming client message %v is manual: %t and startingTx: %t", msg.T, manualTx, startingTx)
 		if startingTx {
 			startNewTx(msg, server, back, &comm_chans)
 			comm_chans = newCommChans(1)
@@ -298,17 +298,17 @@ func startNewTx(msg *bolt.Message, server bolt.BoltConn, back *backend.Backend, 
 			proxy_logger.DebugLog.Println("...asking current tx handler to halt")
 			select {
 			case <-comm_chans.ack:
-				proxy_logger.DebugLog.Println("Tx handler ack'd stop")
+				proxy_logger.DebugLog.Println("tx handler ack'd stop")
 			case <-time.After(5 * time.Second):
-				proxy_logger.DebugLog.Println("Timeout waiting for ack from tx handler")
+				proxy_logger.DebugLog.Println("timeout waiting for ack from tx handler")
 			}
 		default:
 			// this shouldn't happen!
-			panic("Couldn't send halt to tx handler!")
+			panic("couldn't send halt to tx handler!")
 		}
 	}
 
-	proxy_logger.DebugLog.Printf("Grabbed conn for access to memgraph on host %s\n", host)
+	proxy_logger.DebugLog.Printf("grabbed conn for access to memgraph on host %s\n", host)
 }
 
 // Primary Transaction server-side event handler, collecting Messages from
@@ -351,15 +351,15 @@ func handleClientServerCommunication(client, server bolt.BoltConn, comm_chans *C
 			finished = true
 
 		case <-time.After(time.Duration(MAX_IDLE_MINS) * time.Minute):
-			proxy_logger.DebugLog.Println("Timeout reading server!")
+			proxy_logger.DebugLog.Println("timeout reading server!")
 			finished = true
 		}
 	}
 
 	select {
 	case comm_chans.ack <- true:
-		proxy_logger.DebugLog.Println("Tx handler stop ACK sent")
+		proxy_logger.DebugLog.Println("tx handler stop ACK sent")
 	default:
-		proxy_logger.DebugLog.Println("Couldn't put value in ack channel?!")
+		proxy_logger.DebugLog.Println("couldn't put value in ack channel?!")
 	}
 }
