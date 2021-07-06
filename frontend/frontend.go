@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"bytes"
+	"io"
 	"net"
 	"time"
 
@@ -46,17 +47,19 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 	}
 	if bytes.Equal(buf[:4], bolt.BoltSignature[:]) {
 		// First case: we have a direct bolt client connection
-		n, err := conn.Read(buf[:20])
+		handshake := make([]byte, 16)
+		n, err := io.ReadFull(conn, handshake)
+		proxy_logger.DebugLog.Printf("Read %v number of bytes\n", n)
 		if err != nil {
 			proxy_logger.DebugLog.Println("Error peeking at connection from", conn.RemoteAddr())
+			proxy_logger.DebugLog.Printf("Error is %v and size is %v\n", err, n)
 			return
 		}
 		// Make sure we try to use the version we're using the best
 		// version based on the backend server
 		server_version := backend_server.Version().Bytes()
-		proxy_logger.DebugLog.Printf("Received %b\n", buf[:n])
-		proxy_logger.DebugLog.Printf("Received %v\n", buf[:n])
-		clientVersion, err := bolt.ValidateHandshake(buf[:n], server_version)
+		proxy_logger.DebugLog.Printf("Received %v\n", handshake)
+		clientVersion, err := bolt.ValidateHandshake(handshake, server_version)
 		if err != nil {
 			proxy_logger.WarnLog.Printf("err occurred during handshake: %v\n", err)
 			return
@@ -73,15 +76,15 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 	} else if bytes.Equal(buf[:4], bolt.HttpSignature[:]) {
 		// Second case, we have an HTTP which only support health checks.
 		// Read the rest of the request
-		data, err = conn.Read(buf[4:])
+		n, err := conn.Read(buf[4:])
 		if err != nil {
 			proxy_logger.DebugLog.Printf("Failed reading rest of GET request: %s\n", err)
 			return
 		}
 
 		// Health check, maybe? If so, handle and bail.
-		if IsHealthCheck(buf[:data+4]) {
-			err = HandleHealthCheck(conn, buf[:data+4])
+		if IsHealthCheck(buf[:n+4]) {
+			err = HandleHealthCheck(conn, buf[:n+4])
 			if err != nil {
 				proxy_logger.DebugLog.Println(err)
 			}
