@@ -3,6 +3,7 @@ package bolt
 import (
 	"bytes"
 	"errors"
+	"fmt"
 )
 
 // Mode of a Bolt Transaction for determining cluster routing
@@ -46,11 +47,11 @@ func ValidateMagic(magic []byte) (bool, error) {
 // an error and an empty byte array.
 func ValidateHandshake(client, server []byte) ([]byte, error) {
 	if len(server) != 4 {
-		return nil, errors.New("server handshake wrong size")
+		return nil, errors.New(fmt.Sprintf("server handshake wrong size is %v", len(server)))
 	}
 
 	if len(client) != 16 {
-		return nil, errors.New("client handshake wrong size")
+		return nil, errors.New(fmt.Sprintf("client handshake wrong size %v", len(client)))
 	}
 
 	chosen := make([]byte, 4)
