@@ -1,5 +1,6 @@
 ### Instructions
 
+
 1. Create cluster:
     `kind create cluster`
 
@@ -24,3 +25,6 @@
 
 6. And now you should connect using any of the bolt clients, e.g. using `mgconsole`
     `mgconsole -host $NODE_IP $NODE_BOLT_PORT`
+
+
+7. Or just run `run.sh` script.
