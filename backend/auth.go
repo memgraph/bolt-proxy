@@ -12,7 +12,7 @@ import (
 )
 
 type Authenticator interface {
-	Authenticate(user, token string) (bool, error)
+	Authenticate(user, creds string) (bool, error)
 }
 
 type BasicAzureAuth struct {

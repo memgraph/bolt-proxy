@@ -34,5 +34,21 @@ or set up the env variables:
 - `BOLT_PROXY_KEY` -- path to the x509 private key file
 - `BOLT_PROXY_DEBUG` -- set to any value to enable debug mode/logging
 
+# Authentication & Authorization
+
+Currently bolt-proxy supports BasicAuth on Azure. To enable it set the following
+environment variables:
+
+ - `AUTH_METHOD` -- currently only `BASIC_AUTH_AZURE` is supported
+ - `AUTH_AZURE_URL` -- Azure url used for authentication
+ - `AUTH_AZURE_GROUP` -- if set the bolt-will check if the user is a member of this group,
+ otherwise only authentication will be performed
+
+The user should use any client application (`mgconsole`, `neo4j-client`, `pymgclient`...) to connect to Memgraph and
+send username and PAT token as username and password using bolt protocol specification.
+e.g.
+
+`mgconole -username user -password myPatToken`
+
 # Acknowledgments
 Thanks to [Dave Voutila](https://github.com/voutilad) adn his work on bolt-proxy for neo4js [bolt-proxy](https://github.com/voutilad/bolt-proxy) for providing good base and inspiration for this bolt-proxy.
