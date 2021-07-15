@@ -72,7 +72,7 @@ func (auth *BasicAuth) Authenticate(authData map[string]interface{}) error {
 }
 
 func (auth *AADTokenAuth) Authenticate(authData map[string]interface{}) error {
-	jwtString, _, err := getCredentials(authData)
+	_, jwtString, err := getCredentials(authData)
 	if err != nil {
 		return err
 	}

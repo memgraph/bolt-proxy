@@ -36,19 +36,21 @@ or set up the env variables:
 
 # Authentication & Authorization
 
-Currently bolt-proxy supports BasicAuth on Azure. To enable it set the following
-environment variables:
+Currently bolt-proxy supports BasicAuth on and AADToken authentication for Azure.
+To enable it set env variable `AUTH _METHOD` to the one of the possible authentication methods.
 
- - `AUTH_METHOD` -- currently only `BASIC_AUTH_AZURE` is supported
- - `AUTH_AZURE_URL` -- Azure url used for authentication
- - `AUTH_AZURE_GROUP` -- if set the bolt-will check if the user is a member of this group,
- otherwise only authentication will be performed
+ - `AUTH_METHOD` -- currently only `BASIC_AUTH` and `AAD_TOKEN_AUTH` are supported
+
+ Depending on the chosen authentication methods you will need to define specific environment variables:
+
+ - `AAD_TOKEN_CLIENT_ID` -- ClientID of the resource which you wish to authenticate against
+ - `AAD_TOKEN_PROVIDER` -- The Azure authentication provider (e.g. https://login.microsoftonline.com/{tenant_name})
 
 The user should use any client application (`mgconsole`, `neo4j-client`, `pymgclient`...) to connect to Memgraph and
-send username and PAT token as username and password using bolt protocol specification.
-e.g.
-
-`mgconole -username user -password myPatToken`
+send credentials via bolt protocol.
+`mgconole -username user -password password`
+or
+`mgconole -username user -password JWT`
 
 # Acknowledgments
 Thanks to [Dave Voutila](https://github.com/voutilad) adn his work on bolt-proxy for neo4js [bolt-proxy](https://github.com/voutilad/bolt-proxy) for providing good base and inspiration for this bolt-proxy.
