@@ -29,6 +29,9 @@ func NewAuth() (Authenticator, error) {
 	switch authMethod {
 	case "BASIC_AUTH":
 		authURL := os.Getenv("BASIC_AUTH_URL")
+		if authURL == "" {
+			return nil, errors.New("BASIC_AUTH_URL must be set when using AAD_TOKEN_AUTH")
+		}
 
 		return &BasicAuth{
 			url: authURL,
@@ -36,6 +39,9 @@ func NewAuth() (Authenticator, error) {
 	case "AAD_TOKEN_AUTH":
 		clientID := os.Getenv("AAD_TOKEN_CLIENT_ID")
 		provider := os.Getenv("AAD_TOKEN_PROVIDER")
+		if clientID == "" || provider == "" {
+			return nil, errors.New("AAD_TOKEN_CLIENT_ID and AAD_TOKEN_PROVIDER must be set when using AAD_TOKEN_AUTH")
+		}
 
 		return &AADTokenAuth{
 			provider: provider,

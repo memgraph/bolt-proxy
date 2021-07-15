@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -79,7 +80,7 @@ func main() {
 	proxy_logger.InfoLog.Println("starting bolt-proxy backend")
 	auth, err := backend.NewAuth()
 	if err != nil {
-		proxy_logger.InfoLog.Printf("auth not being used: %v", err)
+		panic(fmt.Sprintf("auth not being used: %v\n", err))
 	}
 	back, err := backend.NewBackend(proxy_params.username, proxy_params.password, proxy_params.proxyTo, auth)
 	if err != nil {

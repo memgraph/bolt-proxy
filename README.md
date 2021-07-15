@@ -43,6 +43,7 @@ To enable it set env variable `AUTH _METHOD` to the one of the possible authenti
 
  Depending on the chosen authentication methods you will need to define specific environment variables:
 
+ - `BASIC_AUTH_URL` -- URL against which to authenticate clients credentials
  - `AAD_TOKEN_CLIENT_ID` -- ClientID of the resource which you wish to authenticate against
  - `AAD_TOKEN_PROVIDER` -- The Azure authentication provider (e.g. https://login.microsoftonline.com/{tenant_name})
 
