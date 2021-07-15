@@ -217,7 +217,6 @@ func ParseMap(buf []byte) (map[string]interface{}, int, error) {
 			return result, pos, errors.New(errMsg)
 		}
 	}
-	fmt.Printf("Parsed: %v", result)
 	return result, pos, nil
 }
 
