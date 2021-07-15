@@ -126,8 +126,8 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 	proxy_logger.DebugLog.Println("expected HelloMsg, got:", hello.T)
 
 	if back.IsAuthEnabled() {
-		ok, err := back.Authenticate(hello)
-		if err != nil || !ok {
+		err := back.Authenticate(hello)
+		if err != nil {
 			proxy_logger.WarnLog.Printf("not authorized to use proxy: %v", err)
 			return
 		}

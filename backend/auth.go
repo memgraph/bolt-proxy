@@ -1,111 +1,107 @@
 package backend
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
-	"fmt"
-	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/coreos/go-oidc/v3/oidc"
 )
 
 type Authenticator interface {
-	Authenticate(user, creds string) (bool, error)
+	Authenticate(authData map[string]interface{}) error
 }
 
-type BasicAzureAuth struct {
-	url       string
-	group     string
-	authorize bool
+type BasicAuth struct {
+	url string
 }
 
-type AzureGroupValue struct {
-	SubjectKind   string `json:"subjectKind",string,omitempty`
-	Description   string `json:"description",string,omitempty`
-	Domain        string `json:"domain",string,omitempty`
-	PrincipalName string `json:"principalName",string,omitempty`
-	MailAddress   string `json:"mailAddress",string,omitempty`
-	Origin        string `json:"origin",string,omitempty`
-	OriginID      string `json:"originId",string,omitempty`
-	DisplayName   string `json:"displayName",string,omitempty`
-}
-
-type AzureDevOpsResponse struct {
-	Count int               `json:"count"`
-	Value []AzureGroupValue `json:"value"`
-}
-
-func getAzureDevOpsResponse(body []byte) (*AzureDevOpsResponse, error) {
-	var a = new(AzureDevOpsResponse)
-	err := json.Unmarshal(body, &a)
-	if err != nil {
-		fmt.Println("whoops:", err)
-	}
-	return a, err
+type AADTokenAuth struct {
+	provider string
+	clientID string
 }
 
 func NewAuth() (Authenticator, error) {
 	authMethod := os.Getenv("AUTH_METHOD")
 
 	switch authMethod {
-	case "BASIC_AUTH_AZURE":
-		authURL := os.Getenv("AUTH_AZURE_URL")
-		authGroup := os.Getenv("AUTH_AZURE_GROUP")
-		authorize := false
-		if authGroup != "" {
-			authorize = true
-		}
+	case "BASIC_AUTH":
+		authURL := os.Getenv("BASIC_AUTH_URL")
 
-		return &BasicAzureAuth{
-			url:       authURL,
-			group:     authGroup,
-			authorize: authorize,
+		return &BasicAuth{
+			url: authURL,
+		}, nil
+	case "AAD_TOKEN_AUTH":
+		clientID := os.Getenv("AAD_TOKEN_CLIENT_ID")
+		provider := os.Getenv("AAD_TOKEN_PROVIDER")
+
+		return &AADTokenAuth{
+			provider: provider,
+			clientID: clientID,
 		}, nil
 	default:
 		return nil, errors.New("no auth method found")
 	}
 }
 
-func (basicAuth *BasicAzureAuth) Authenticate(user, creds string) (bool, error) {
-	// var url string = fmt.Sprintf(basicAuth.url+"%s/_apis/graph/groups?api-version=5.1-preview.1", user)
+func (auth *BasicAuth) Authenticate(authData map[string]interface{}) error {
+	principal, creds, err := getCredentials(authData)
+	if err != nil {
+		return err
+	}
+
 	client := &http.Client{
 		Timeout: time.Second * 5,
 	}
-	req, err := http.NewRequest("GET", basicAuth.url, nil)
+	req, err := http.NewRequest("GET", auth.url, nil)
 	if err != nil {
-		return false, err
+		return err
 	}
-	req.SetBasicAuth(user, creds)
+	req.SetBasicAuth(principal, creds)
 	rawResp, err := client.Do(req)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if rawResp.StatusCode != 200 {
-		return false, errors.New("unauthorized creds")
+		return errors.New("unauthorized creds")
 	}
 
-	bodyText, err := ioutil.ReadAll(rawResp.Body)
+	return nil
+}
+
+func (auth *AADTokenAuth) Authenticate(authData map[string]interface{}) error {
+	jwtString, _, err := getCredentials(authData)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	if basicAuth.authorize {
-		resp, err := getAzureDevOpsResponse([]byte(bodyText))
-		if err != nil {
-			log.Fatal(err)
-			return false, err
-		}
-
-		for _, v := range resp.Value {
-			if v.DisplayName == basicAuth.group {
-				return true, nil
-			}
-		}
-	} else {
-		return true, nil
+	ctx := context.Background()
+	provider, err := oidc.NewProvider(ctx, auth.provider)
+	if err != nil {
+		return err
 	}
 
-	return false, fmt.Errorf("user not authorized in %v group", basicAuth.group)
+	var verifier = provider.Verifier(&oidc.Config{ClientID: auth.clientID})
+
+	// Parse and verify ID Token payload.
+	_, err = verifier.Verify(ctx, jwtString)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func getCredentials(authData map[string]interface{}) (string, string, error) {
+	principal, ok := authData["principal"].(string)
+	if !ok {
+		return "", "", errors.New("no principal")
+	}
+	creds, ok := authData["credentials"].(string)
+	if !ok {
+		return "", "", errors.New("no credentials")
+	}
+
+	return principal, creds, nil
 }

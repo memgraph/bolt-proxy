@@ -158,7 +158,7 @@ func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltCon
 }
 
 // This part can be extended with third party auth service, so that Memgraph does not perform auth
-func (b *Backend) Authenticate(hello *bolt.Message) (bool, error) {
+func (b *Backend) Authenticate(hello *bolt.Message) error {
 	if hello.T != bolt.HelloMsg {
 		panic("authenticate requires a Hello message")
 	}
@@ -174,17 +174,9 @@ func (b *Backend) Authenticate(hello *bolt.Message) (bool, error) {
 		proxy_logger.DebugLog.Printf("XXX pos: %d, hello map: %#v\n", pos, msg)
 		panic(err)
 	}
-	principal, ok := msg["principal"].(string)
-	if !ok {
-		return false, nil
-	}
-	creds, ok := msg["credentials"].(string)
-	if !ok {
-		return false, nil
-	}
 
 	if b.auth != nil {
-		return b.auth.Authenticate(principal, creds)
+		return b.auth.Authenticate(msg)
 	}
-	return true, nil
+	return nil
 }
