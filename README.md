@@ -49,9 +49,11 @@ To enable it set env variable `AUTH _METHOD` to the one of the possible authenti
 
 The user should use any client application (`mgconsole`, `neo4j-client`, `pymgclient`...) to connect to Memgraph and
 send credentials via bolt protocol.
-`mgconole -username user -password password`
+`mgconsole -username user -password password`
 or
-`mgconole -username user -password JWT`
+`mgconsole -username user -password JWT`
 
 # Acknowledgments
-Thanks to [Dave Voutila](https://github.com/voutilad) adn his work on bolt-proxy for neo4js [bolt-proxy](https://github.com/voutilad/bolt-proxy) for providing good base and inspiration for this bolt-proxy.
+
+Thanks to [Dave Voutila](https://github.com/voutilad) and his work on bolt-proxy for Neo4js
+[bolt-proxy](https://github.com/voutilad/bolt-proxy) and for providing good base and inspiration for this bolt-proxy.
