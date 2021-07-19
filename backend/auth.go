@@ -30,7 +30,7 @@ func NewAuth() (Authenticator, error) {
 	case "BASIC_AUTH":
 		authURL := os.Getenv("BASIC_AUTH_URL")
 		if authURL == "" {
-			return nil, errors.New("BASIC_AUTH_URL must be set when using AAD_TOKEN_AUTH")
+			return nil, errors.New("BASIC_AUTH_URL must be set when using BASIC_AUTH")
 		}
 
 		return &BasicAuth{
