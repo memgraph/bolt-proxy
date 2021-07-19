@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -76,16 +77,20 @@ func main() {
 	}
 
 	// ---------- BACK END
-	proxy_logger.InfoLog.Println("Starting bolt-proxy backend")
-	backend, err := backend.NewBackend(proxy_params.username, proxy_params.password, proxy_params.proxyTo)
+	proxy_logger.InfoLog.Println("starting bolt-proxy backend")
+	auth, err := backend.NewAuth()
+	if err != nil {
+		panic(fmt.Sprintf("auth not being used: %v\n", err))
+	}
+	back, err := backend.NewBackend(proxy_params.username, proxy_params.password, proxy_params.proxyTo, auth)
 	if err != nil {
 		proxy_logger.WarnLog.Fatal(err)
 	}
-	proxy_logger.InfoLog.Println("Connected to backend", proxy_params.proxyTo)
-	proxy_logger.InfoLog.Printf("Found backend version %s\n", backend.Version())
+	proxy_logger.InfoLog.Println("connected to backend", proxy_params.proxyTo)
+	proxy_logger.InfoLog.Printf("found backend version %s\n", back.Version())
 
 	// ---------- FRONT END
-	proxy_logger.InfoLog.Println("Starting bolt-proxy frontend")
+	proxy_logger.InfoLog.Println("starting bolt-proxy frontend")
 
 	var listener net.Listener
 	if proxy_params.certFile == "" || proxy_params.keyFile == "" {
@@ -94,7 +99,7 @@ func main() {
 		if err != nil {
 			proxy_logger.WarnLog.Fatal(err)
 		}
-		proxy_logger.InfoLog.Printf("Listening on %s\n", proxy_params.bindOn)
+		proxy_logger.InfoLog.Printf("listening on %s\n", proxy_params.bindOn)
 	} else {
 		// tls
 		cert, err := tls.LoadX509KeyPair(proxy_params.certFile, proxy_params.keyFile)
@@ -112,9 +117,9 @@ func main() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			proxy_logger.WarnLog.Printf("Error: %v\n", err)
+			proxy_logger.WarnLog.Printf("error: %v\n", err)
 		} else {
-			go frontend.HandleClient(conn, backend)
+			go frontend.HandleClient(conn, back)
 		}
 	}
 }

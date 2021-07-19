@@ -23,10 +23,11 @@ type Backend struct {
 	monitor        *Monitor
 	tls            bool
 	main_uri       *url.URL
+	auth           Authenticator
 	connectionPool map[string]map[string]bolt.BoltConn
 }
 
-func NewBackend(username, password, uri string, hosts ...string) (*Backend, error) {
+func NewBackend(username, password, uri string, auth Authenticator, hosts ...string) (*Backend, error) {
 	tls := false
 	u, err := url.Parse(uri)
 	if err != nil {
@@ -50,6 +51,7 @@ func NewBackend(username, password, uri string, hosts ...string) (*Backend, erro
 		monitor:        monitor,
 		tls:            tls,
 		main_uri:       u,
+		auth:           auth,
 		connectionPool: make(map[string]map[string]bolt.BoltConn),
 	}, nil
 }
@@ -60,6 +62,10 @@ func (b *Backend) Version() bolt.Version {
 
 func (b *Backend) MainInstance() *url.URL {
 	return b.main_uri
+}
+
+func (b *Backend) IsAuthEnabled() bool {
+	return b.auth != nil
 }
 
 func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltConn, error) {
@@ -90,7 +96,7 @@ func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltCon
 	_, err = conn.Write(handshake)
 
 	if err != nil {
-		msg := fmt.Sprintf("Couldn't send handshake to auth server %s: %s", address, err)
+		msg := fmt.Sprintf("couldn't send handshake to auth server %s: %s", address, err)
 		conn.Close()
 		return nil, errors.New(msg)
 	}
@@ -100,7 +106,7 @@ func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltCon
 	buf := make([]byte, 256)
 	n, err := conn.Read(buf)
 	if err != nil || n != 4 {
-		msg := fmt.Sprintf("Didn't get valid handshake response from auth server %s: %s", address, err)
+		msg := fmt.Sprintf("didn't get valid handshake response from auth server %s: %s", address, err)
 		conn.Close()
 		return nil, errors.New(msg)
 	}
@@ -152,7 +158,7 @@ func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltCon
 }
 
 // This part can be extended with third party auth service, so that Memgraph does not perform auth
-func (b *Backend) Authenticate(hello *bolt.Message) (bool, error) {
+func (b *Backend) Authenticate(hello *bolt.Message) error {
 	if hello.T != bolt.HelloMsg {
 		panic("authenticate requires a Hello message")
 	}
@@ -160,7 +166,7 @@ func (b *Backend) Authenticate(hello *bolt.Message) (bool, error) {
 	// TODO: clean up this api...push the dirt into Bolt package?
 	data := hello.Data[4:]
 	client_string, pos, err := bolt.ParseString(data)
-	proxy_logger.DebugLog.Printf("Client string %s", client_string)
+	proxy_logger.DebugLog.Printf("client string %s", client_string)
 
 	auth_data := data[pos:]
 	msg, pos, err := bolt.ParseMap(auth_data)
@@ -168,21 +174,9 @@ func (b *Backend) Authenticate(hello *bolt.Message) (bool, error) {
 		proxy_logger.DebugLog.Printf("XXX pos: %d, hello map: %#v\n", pos, msg)
 		panic(err)
 	}
-	principal, ok := msg["principal"].(string)
-	if !ok {
-		panic("principal in Hello message was not a string")
+
+	if b.auth != nil {
+		return b.auth.Authenticate(msg)
 	}
-	proxy_logger.DebugLog.Println("found principal:", principal)
-
-	defaultHost := b.monitor.host
-
-	proxy_logger.DebugLog.Printf("Conencting to %v %v", b.main_uri.Scheme, b.monitor.host)
-	conn, err := net.Dial("tcp", b.monitor.host)
-
-	// // Ok, now to get the rest
-	conns := make(map[string]bolt.BoltConn, 1)
-	conns[defaultHost] = bolt.NewDirectConn(conn)
-
-	//TODO Implement auth module here
-	return true, nil
+	return nil
 }

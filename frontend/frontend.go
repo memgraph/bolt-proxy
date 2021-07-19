@@ -125,6 +125,31 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 	}
 	proxy_logger.DebugLog.Println("expected HelloMsg, got:", hello.T)
 
+	if back.IsAuthEnabled() {
+		err := back.Authenticate(hello)
+		if err != nil {
+			proxy_logger.WarnLog.Printf("not authorized to use proxy: %v\n", err)
+			// TODO clients wont recognize unless it is specifically from Memgraph
+			errorMsgSerialized, err := bolt.TinyMapToBytes(map[string]interface{}{
+				"code":    "Memgraph.ClientError.Security.Unauthenticated",
+				"message": "Authentication Failure",
+			})
+			if err != nil {
+				proxy_logger.WarnLog.Printf("failed to serialize error message: %v\n", err)
+			}
+			// TODO all of these header and ends appends to bolt transformation
+			failureData := append([]byte{
+				0x00, 0x57, 0xb1, 0x7f}, errorMsgSerialized...)
+			failureData = append(failureData, []byte{0x00, 0x00}...)
+			failure_msg := bolt.Message{
+				T:    bolt.FailureMsg,
+				Data: failureData,
+			}
+
+			client.WriteMessage(&failure_msg)
+			return
+		}
+	}
 	server_conn, err := back.InitBoltConnection(hello.Data, "tcp")
 	if err != nil {
 		proxy_logger.DebugLog.Println(err)
