@@ -24,7 +24,7 @@
         NODE_BOLT_PORT=`kubectl get svc bolt-proxy-controller -o go-template='{{range.spec.ports}}{{if .nodePort}}{{.nodePort}}{{"\n"}}{{end}}{{end}}'`
 
 6. And now you should connect using any of the bolt clients, e.g. using `mgconsole`
-    `mgconsole -host $NODE_IP $NODE_BOLT_PORT`
+    `mgconsole -host $NODE_IP -port $NODE_BOLT_PORT`
 
 
 7. Or just run `run.sh` script.
