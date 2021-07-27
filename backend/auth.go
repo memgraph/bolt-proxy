@@ -48,7 +48,7 @@ func NewAuth() (Authenticator, error) {
 			clientID: clientID,
 		}, nil
 	default:
-		return nil, errors.New("no auth method found")
+		return nil, nil
 	}
 }
 
