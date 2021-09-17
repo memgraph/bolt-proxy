@@ -34,7 +34,7 @@ or set up the env variables:
 - `BOLT_PROXY_KEY` -- path to the x509 private key file
 - `BOLT_PROXY_DEBUG` -- set to any value to enable debug mode/logging
 
-# Authentication & Authorization
+## Authentication & Authorization
 
 Currently bolt-proxy supports BasicAuth on and AADToken authentication for Azure.
 To enable it set env variable `AUTH _METHOD` to the one of the possible authentication methods.
@@ -53,7 +53,11 @@ send credentials via bolt protocol.
 or
 `mgconsole -username user -password JWT`
 
-# Acknowledgments
+## Acknowledgments
 
 Thanks to [Dave Voutila](https://github.com/voutilad) and his work on bolt-proxy for Neo4js
 [bolt-proxy](https://github.com/voutilad/bolt-proxy) and for providing good base and inspiration for this bolt-proxy.
+
+## License
+
+[Apache License 2.0](https://github.com/memgraph/bolt-proxy/blob/main/LICENSE)
