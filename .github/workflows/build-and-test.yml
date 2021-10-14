@@ -1,6 +1,6 @@
 name: Build and Test
 
-on: [pull_request]
+on: [pull_request, workflow_dispatch]
 
 jobs:
   test:
@@ -11,11 +11,11 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Install Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: ${{ matrix.go-version }}
-    - name: Checkout code
-      uses: actions/checkout@v2
-    - name: Build & Test
-      run: make test
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build & Test
+        run: make test
