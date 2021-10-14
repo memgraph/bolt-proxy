@@ -6,12 +6,8 @@
   <a href="https://github.com/memgraph/bolt-proxy/LICENSE">
     <img src="https://img.shields.io/github/license/memgraph/bolt-proxy" alt="license" title="license"/>
   </a>
-
-[![Build and Test](https://github.com/memgraph/bolt-proxy/actions/workflows/build-and-test.yml/badge.svg)]
-(https://github.com/memgraph/bolt-proxy/actions/workflows/build-and-test.yml)
-
-  <a href="https://github.com/memgraph/bolt-proxy/actions">
-    <img src="https://img.shields.io/github/workflow/status/memgraph/bolt-proxy/CI" alt="build" title="build"/>
+  <a href="https://github.com/memgraph/bolt-proxy/actions/workflows/build-and-test.yml">
+    <img src="https://github.com/memgraph/bolt-proxy/actions/workflows/build-and-test.yml/badge.svg" alt="build" title="build"/>
   </a>
   <a href="https://github.com/memgraph/bolt-proxy">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="build" title="build"/>
