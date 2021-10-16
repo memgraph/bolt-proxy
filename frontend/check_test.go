@@ -33,7 +33,8 @@ func TestHealthCheckHandler(t *testing.T) {
 			buf := make([]byte, 128)
 			n, err := right.Read(buf)
 			if err != nil {
-				t.Fatal(err)
+				t.Errorf("read #%v: %v", i, err)
+				continue
 			}
 			c <- buf[:n]
 		}
