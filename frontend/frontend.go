@@ -203,8 +203,8 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 // Time to begin the client-side event loop!
 func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backend) {
 	var (
-		startingTx bool = false
-		manualTx   bool = false
+		startingTx = false
+		manualTx   = false
 		err        error
 	)
 	comm_chans := newCommChans(1)
