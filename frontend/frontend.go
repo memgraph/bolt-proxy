@@ -306,14 +306,15 @@ func startNewTx(msg *bolt.Message, server bolt.BoltConn, back *backend.Backend, 
 	var err error
 
 	var n int
-	if msg.T == bolt.BeginMsg {
+	switch msg.T {
+	case bolt.BeginMsg:
 		proxy_logger.DebugLog.Print("proxy_logger.DebugLog begin MSG")
 		_, _, err = bolt.ParseMap(msg.Data[4:])
 		if err != nil {
 			proxy_logger.DebugLog.Println(err)
 			return
 		}
-	} else if msg.T == bolt.RunMsg {
+	case bolt.RunMsg:
 		proxy_logger.DebugLog.Print("proxy_logger.DebugLog begin RUN")
 		pos := 4
 		// query
@@ -329,7 +330,7 @@ func startNewTx(msg *bolt.Message, server bolt.BoltConn, back *backend.Backend, 
 			proxy_logger.DebugLog.Println(err)
 			return
 		}
-	} else {
+	default:
 		panic("shouldn't be starting a tx without a Begin or Run message")
 	}
 
