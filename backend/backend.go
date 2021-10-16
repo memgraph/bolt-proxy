@@ -28,19 +28,19 @@ import (
 )
 
 type Parameters struct {
-	debugMode          bool
 	bindOn             string
 	proxyTo            string
 	username, password string
 	certFile, keyFile  string
+	debugMode          bool
 }
 
 type Backend struct {
 	monitor        *Monitor
-	tls            bool
 	main_uri       *url.URL
 	auth           Authenticator
 	connectionPool map[string]map[string]bolt.BoltConn
+	tls            bool
 }
 
 func NewBackend(username, password, uri string, auth Authenticator, hosts ...string) (*Backend, error) {
