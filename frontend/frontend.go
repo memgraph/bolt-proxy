@@ -318,12 +318,11 @@ func startNewTx(msg *bolt.Message, server bolt.BoltConn, back *backend.Backend, 
 		}
 		pos = pos + n
 		// query params
-		_, n, err = bolt.ParseMap(msg.Data[pos:])
+		_, _, err = bolt.ParseMap(msg.Data[pos:])
 		if err != nil {
 			proxy_logger.DebugLog.Println(err)
 			return
 		}
-		pos = pos + n
 	} else {
 		panic("shouldn't be starting a tx without a Begin or Run message")
 	}
