@@ -235,7 +235,7 @@ func ParseMap(buf []byte) (map[string]interface{}, int, error) {
 // Parse a TinyInt...which is a simply 7-bit number.
 func ParseTinyInt(b byte) (int, error) {
 	if b > 0x7f {
-		return 0, errors.New("expected tiny-int!")
+		return 0, errors.New("expected tiny-int")
 	}
 	return int(b), nil
 }
@@ -272,7 +272,7 @@ func ParseInt(buf []byte) (int, int, error) {
 // Otherwise, return an empty string, 0, and an error.
 func ParseTinyString(buf []byte) (string, int, error) {
 	if len(buf) == 0 || buf[0]>>4 != 0x8 {
-		return "", 0, errors.New("expected tiny-string!")
+		return "", 0, errors.New("expected tiny-string")
 	}
 
 	size := int(buf[0] & 0xf)
@@ -491,7 +491,7 @@ func TinyMapToBytes(tinymap map[string]interface{}) ([]byte, error) {
 	buf := make([]byte, 1024*4)
 
 	if len(tinymap) > 15 {
-		return []byte{}, errors.New("too many keys for a tinymap!")
+		return []byte{}, errors.New("too many keys for a tinymap")
 	}
 
 	buf[0] = byte(0xa0 + uint8(len(tinymap)))

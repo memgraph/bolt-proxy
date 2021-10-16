@@ -333,7 +333,7 @@ func (c WsConn) readMessages() ([]*Message, error) {
 
 	// TODO: handle header.Length == 0 situations?
 	if header.Length == 0 {
-		return nil, errors.New("zero length header?!")
+		return nil, errors.New("zero length header")
 	}
 
 	// TODO: under-reads!!!
