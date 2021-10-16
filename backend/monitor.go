@@ -65,7 +65,7 @@ func NewMonitor(user, password, uri string, hosts ...string) (*Monitor, error) {
 		return nil, err
 	}
 
-	version := bolt.Version{1, 0, 0}
+	version := bolt.Version{Major: 1, Minor: 0, Patch: 0}
 
 	// Get the cluster members and ttl details
 	u, err := url.Parse(uri)
