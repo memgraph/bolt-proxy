@@ -168,8 +168,16 @@ func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltCon
 	}
 
 	// Try to be polite and say goodbye if we know we failed.
-	conn.Write([]byte{0x00, 0x02, 0xb0, 0x02})
-	conn.Close()
+	_, err = conn.Write([]byte{0x00, 0x02, 0xb0, 0x02})
+	if err != nil {
+		return nil, fmt.Errorf("write: %v", err)
+	}
+
+	err = conn.Close()
+	if err != nil {
+		return nil, fmt.Errorf("close: %v", err)
+	}
+
 	return nil, errors.New("unknown error from auth server")
 }
 
@@ -182,6 +190,9 @@ func (b *Backend) Authenticate(hello *bolt.Message) error {
 	// TODO: clean up this api...push the dirt into Bolt package?
 	data := hello.Data[4:]
 	client_string, pos, err := bolt.ParseString(data)
+	if err != nil {
+		return fmt.Errorf("parse: %v", err)
+	}
 	proxy_logger.DebugLog.Printf("client string %s", client_string)
 
 	auth_data := data[pos:]
