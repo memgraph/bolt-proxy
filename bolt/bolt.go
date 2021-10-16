@@ -280,7 +280,7 @@ func ParseTinyString(buf []byte) (string, int, error) {
 		return "", 1, nil
 	}
 
-	return fmt.Sprintf("%s", buf[1:size+1]), size + 1, nil
+	return string(buf[1 : size+1]), size + 1, nil
 }
 
 // Parse a byte slice into a string, returning the string value, the last
@@ -309,7 +309,7 @@ func ParseString(buf []byte) (string, int, error) {
 
 	// decode the actual string length
 	size := int(binary.BigEndian.Uint64(sizeBytes[len(sizeBytes)-8:]))
-	return fmt.Sprintf("%s", buf[pos:pos+size]), pos + size, nil
+	return string(buf[pos : pos+size]), pos + size, nil
 }
 
 // Parse a byte slice into a TinyArray as an array of interface{} values,
