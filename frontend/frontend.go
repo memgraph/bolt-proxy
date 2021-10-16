@@ -162,7 +162,10 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 				Data: failureData,
 			}
 
-			client.WriteMessage(&failure_msg)
+			err = client.WriteMessage(&failure_msg)
+			if err != nil {
+				proxy_logger.DebugLog.Printf("failed to write message: %v", err)
+			}
 			return
 		}
 	}
@@ -280,7 +283,7 @@ func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backe
 				// XXX: Neo4j Desktop does this when defining a
 				// remote dbms connection.
 				// simply send empty success message
-				client.WriteMessage(&bolt.Message{
+				err := client.WriteMessage(&bolt.Message{
 					T: bolt.SuccessMsg,
 					Data: []byte{
 						0x00, 0x03,
@@ -289,6 +292,9 @@ func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backe
 						0x00, 0x00,
 					},
 				})
+				if err != nil {
+					proxy_logger.DebugLog.Printf("failed to write message: %v", err)
+				}
 			case bolt.GoodbyeMsg:
 				return
 			}
