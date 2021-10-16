@@ -55,7 +55,7 @@ func NewBackend(username, password, uri string, auth Authenticator, hosts ...str
 	case "bolt", "neo4j":
 		// ok
 	default:
-		return nil, errors.New("Invalid bolt connection scheme")
+		return nil, errors.New("invalid bolt connection scheme")
 	}
 
 	monitor, err := NewMonitor(username, password, uri, hosts...)
@@ -143,12 +143,13 @@ func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltCon
 	}
 
 	msg := bolt.IdentifyType(buf)
-	if msg == bolt.FailureMsg {
+	switch msg {
+	case bolt.FailureMsg:
 		// See if we can extract the error message
-		r, _, err := bolt.ParseMap(buf[4:n])
-		if err != nil {
+		r, _, errParse := bolt.ParseMap(buf[4:n])
+		if errParse != nil {
 			conn.Close()
-			return nil, err
+			return nil, errParse
 		}
 
 		val, found := r["message"]
@@ -161,7 +162,7 @@ func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltCon
 		}
 		conn.Close()
 		return nil, errors.New("could not parse auth server response")
-	} else if msg == bolt.SuccessMsg {
+	case bolt.SuccessMsg:
 		// The only happy outcome! Keep conn open.
 		bolt_connection := bolt.NewDirectConn(conn)
 		return bolt_connection, nil
