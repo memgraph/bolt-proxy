@@ -508,13 +508,13 @@ func TinyMapToBytes(tinymap map[string]interface{}) ([]byte, error) {
 
 		// now the value
 		val := tinymap[key]
-		switch val.(type) {
+		switch v := val.(type) {
 		case int:
-			raw, err = IntToBytes(val.(int))
+			raw, err = IntToBytes(v)
 		case string:
-			raw, err = StringToBytes(val.(string))
+			raw, err = StringToBytes(v)
 		case map[string]interface{}:
-			raw, err = TinyMapToBytes(val.(map[string]interface{}))
+			raw, err = TinyMapToBytes(v)
 		case nil:
 			raw = []byte{0xc0}
 		default:
