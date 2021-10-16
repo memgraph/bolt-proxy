@@ -36,21 +36,21 @@ type Type string
 
 const (
 	ResetMsg    Type = "RESET"
-	RunMsg           = "RUN"
-	DiscardMsg       = "DISCARD"
-	PullMsg          = "PULL"
-	RecordMsg        = "RECORD"
-	SuccessMsg       = "SUCCESS"
-	IgnoreMsg        = "IGNORE"
-	FailureMsg       = "FAILURE"
-	HelloMsg         = "HELLO"
-	GoodbyeMsg       = "GOODBYE"
-	BeginMsg         = "BEGIN"
-	CommitMsg        = "COMMIT"
-	RollbackMsg      = "ROLLBACK"
-	UnknownMsg       = "?UNKNOWN?"
-	NopMsg           = "NOP"
-	ChunkedMsg       = "CHUNKED" // not a true bolt message
+	RunMsg      Type = "RUN"
+	DiscardMsg  Type = "DISCARD"
+	PullMsg     Type = "PULL"
+	RecordMsg   Type = "RECORD"
+	SuccessMsg  Type = "SUCCESS"
+	IgnoreMsg   Type = "IGNORE"
+	FailureMsg  Type = "FAILURE"
+	HelloMsg    Type = "HELLO"
+	GoodbyeMsg  Type = "GOODBYE"
+	BeginMsg    Type = "BEGIN"
+	CommitMsg   Type = "COMMIT"
+	RollbackMsg Type = "ROLLBACK"
+	UnknownMsg  Type = "?UNKNOWN?"
+	NopMsg      Type = "NOP"
+	ChunkedMsg  Type = "CHUNKED" // not a true bolt message
 )
 
 // Parse a byte into the corresponding Bolt message Type

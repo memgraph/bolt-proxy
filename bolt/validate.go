@@ -27,7 +27,7 @@ type Mode string
 
 const (
 	ReadMode  Mode = "READ"
-	WriteMode      = "WRITE"
+	WriteMode Mode = "WRITE"
 )
 
 // Inspect bytes for valid Bolt Magic pattern, returning true if found.
