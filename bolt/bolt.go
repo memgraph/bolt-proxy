@@ -465,14 +465,24 @@ func IntToBytes(i int) ([]byte, error) {
 		buf.Write([]byte{0xc8, byte(uint(i))})
 	} else if i < 0x10000 {
 		buf.WriteByte(byte(0xc9))
-		binary.Write(buf, binary.BigEndian, uint16(i))
+		err := binary.Write(buf, binary.BigEndian, uint16(i))
+		if err != nil {
+			return nil, err
+		}
 	} else if i < 0x100000000 {
 		buf.WriteByte(byte(0xca))
-		binary.Write(buf, binary.BigEndian, uint32(i))
+		err := binary.Write(buf, binary.BigEndian, uint32(i))
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		buf.WriteByte(byte(0xcb))
-		binary.Write(buf, binary.BigEndian, uint64(i))
+		err := binary.Write(buf, binary.BigEndian, uint64(i))
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	return buf.Bytes(), nil
 }
 
