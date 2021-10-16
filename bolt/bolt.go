@@ -153,7 +153,6 @@ func ParseMap(buf []byte) (map[string]interface{}, int, error) {
 		case 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7: // tiny-int
 			val, err := ParseTinyInt(buf[pos])
 			if err != nil {
-				panic(err)
 				return result, pos, err
 			}
 			result[name] = val
@@ -161,7 +160,6 @@ func ParseMap(buf []byte) (map[string]interface{}, int, error) {
 		case 0x8: // tiny-string
 			val, n, err := ParseTinyString(buf[pos:])
 			if err != nil {
-				panic(err)
 				return result, pos, err
 			}
 			result[name] = val
@@ -169,7 +167,6 @@ func ParseMap(buf []byte) (map[string]interface{}, int, error) {
 		case 0x9: // tiny-array
 			val, n, err := ParseArray(buf[pos:])
 			if err != nil {
-				panic(err)
 				return result, pos, err
 			}
 			result[name] = val
@@ -177,7 +174,6 @@ func ParseMap(buf []byte) (map[string]interface{}, int, error) {
 		case 0xa: // tiny-map
 			value, n, err := ParseMap(buf[pos:])
 			if err != nil {
-				panic(err)
 				return result, pos, err
 			}
 			result[name] = value
