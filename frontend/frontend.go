@@ -48,7 +48,7 @@ func newCommChans(size int) CommunicationChannels {
 // a client handler
 func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 	defer func() {
-		proxy_logger.DebugLog.Printf("closing client connection from %s\n",
+		proxy_logger.DebugLog.Printf("closing client connection from %s",
 			conn.RemoteAddr())
 		conn.Close()
 	}()
@@ -65,24 +65,24 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		// First case: we have a direct bolt client connection
 		handshake := make([]byte, 16)
 		n, err := io.ReadFull(conn, handshake)
-		proxy_logger.DebugLog.Printf("read %v number of bytes\n", n)
+		proxy_logger.DebugLog.Printf("read %v number of bytes", n)
 		if err != nil {
 			proxy_logger.DebugLog.Println("error peeking at connection from", conn.RemoteAddr())
-			proxy_logger.DebugLog.Printf("error is %v and size is %v\n", err, n)
+			proxy_logger.DebugLog.Printf("error is %v and size is %v", err, n)
 			return
 		}
 		// Make sure we try to use the version we're using the best
 		// version based on the backend server
 		server_version := backend_server.Version().Bytes()
-		proxy_logger.DebugLog.Printf("received %v\n", handshake)
+		proxy_logger.DebugLog.Printf("received %v", handshake)
 		clientVersion, err := bolt.ValidateHandshake(handshake, server_version)
 		if err != nil {
-			proxy_logger.WarnLog.Printf("err occurred during handshake: %v\n", err)
+			proxy_logger.WarnLog.Printf("err occurred during handshake: %v", err)
 			return
 		}
 		_, err = conn.Write(clientVersion)
 		if err != nil {
-			proxy_logger.WarnLog.Printf("err occurred version negotiation: %v\n", err)
+			proxy_logger.WarnLog.Printf("err occurred version negotiation: %v", err)
 			return
 		}
 		// regular bolt
@@ -94,7 +94,7 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 		// Read the rest of the request
 		n, err := conn.Read(buf[4:])
 		if err != nil {
-			proxy_logger.DebugLog.Printf("failed reading rest of GET request: %s\n", err)
+			proxy_logger.DebugLog.Printf("failed reading rest of GET request: %v", err)
 			return
 		}
 
@@ -109,7 +109,7 @@ func HandleClient(conn net.Conn, backend_server *backend.Backend) {
 
 	} else {
 		// not bolt, not http...something else?
-		proxy_logger.InfoLog.Printf("client %s is speaking gibberish: %#v\n",
+		proxy_logger.InfoLog.Printf("client %s is speaking gibberish: %#v",
 			conn.RemoteAddr(), buf[:4])
 	}
 }
@@ -120,8 +120,8 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 	// Intercept HELLO message for authentication and hold onto it
 	// for use in backend authentication
 	var hello *bolt.Message
-	proxy_logger.InfoLog.Printf("version: %v\n", clientVersion)
-	proxy_logger.InfoLog.Printf("client: %v\n", client)
+	proxy_logger.InfoLog.Printf("version: %v", clientVersion)
+	proxy_logger.InfoLog.Printf("client: %v", client)
 	select {
 	case msg, ok := <-client.R():
 		if !ok {
@@ -144,14 +144,14 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 	if back.IsAuthEnabled() {
 		err := back.Authenticate(hello)
 		if err != nil {
-			proxy_logger.WarnLog.Printf("not authorized to use proxy: %v\n", err)
+			proxy_logger.WarnLog.Printf("not authorized to use proxy: %v", err)
 			// TODO clients wont recognize unless it is specifically from Memgraph
 			errorMsgSerialized, err := bolt.TinyMapToBytes(map[string]interface{}{
 				"code":    "Memgraph.ClientError.Security.Unauthenticated",
 				"message": "Authentication Failure",
 			})
 			if err != nil {
-				proxy_logger.WarnLog.Printf("failed to serialize error message: %v\n", err)
+				proxy_logger.WarnLog.Printf("failed to serialize error message: %v", err)
 			}
 			// TODO all of these header and ends appends to bolt transformation
 			failureData := append([]byte{
@@ -162,7 +162,10 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 				Data: failureData,
 			}
 
-			client.WriteMessage(&failure_msg)
+			err = client.WriteMessage(&failure_msg)
+			if err != nil {
+				proxy_logger.DebugLog.Printf("failed to write message: %v", err)
+			}
 			return
 		}
 	}
@@ -173,10 +176,10 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 	}
 
 	v, _ := bolt.ParseVersion(clientVersion)
-	proxy_logger.InfoLog.Printf("authenticated client %s speaking %s to %s server\n",
+	proxy_logger.InfoLog.Printf("authenticated client %s speaking %s to %s server",
 		client, v, back.MainInstance().Host)
 	defer func() {
-		proxy_logger.InfoLog.Printf("goodbye to client %s\n", client)
+		proxy_logger.InfoLog.Printf("goodbye to client %s", client)
 	}()
 
 	// TODO: Replace hardcoded Success message with dynamic one
@@ -203,8 +206,8 @@ func handleBoltConn(client bolt.BoltConn, clientVersion []byte, back *backend.Ba
 // Time to begin the client-side event loop!
 func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backend) {
 	var (
-		startingTx bool = false
-		manualTx   bool = false
+		startingTx = false
+		manualTx   = false
 		err        error
 	)
 	comm_chans := newCommChans(1)
@@ -280,7 +283,7 @@ func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backe
 				// XXX: Neo4j Desktop does this when defining a
 				// remote dbms connection.
 				// simply send empty success message
-				client.WriteMessage(&bolt.Message{
+				err := client.WriteMessage(&bolt.Message{
 					T: bolt.SuccessMsg,
 					Data: []byte{
 						0x00, 0x03,
@@ -289,6 +292,9 @@ func proxyListen(client bolt.BoltConn, server bolt.BoltConn, back *backend.Backe
 						0x00, 0x00,
 					},
 				})
+				if err != nil {
+					proxy_logger.DebugLog.Printf("failed to write message: %v", err)
+				}
 			case bolt.GoodbyeMsg:
 				return
 			}
@@ -300,14 +306,15 @@ func startNewTx(msg *bolt.Message, server bolt.BoltConn, back *backend.Backend, 
 	var err error
 
 	var n int
-	if msg.T == bolt.BeginMsg {
+	switch msg.T {
+	case bolt.BeginMsg:
 		proxy_logger.DebugLog.Print("proxy_logger.DebugLog begin MSG")
 		_, _, err = bolt.ParseMap(msg.Data[4:])
 		if err != nil {
 			proxy_logger.DebugLog.Println(err)
 			return
 		}
-	} else if msg.T == bolt.RunMsg {
+	case bolt.RunMsg:
 		proxy_logger.DebugLog.Print("proxy_logger.DebugLog begin RUN")
 		pos := 4
 		// query
@@ -318,13 +325,12 @@ func startNewTx(msg *bolt.Message, server bolt.BoltConn, back *backend.Backend, 
 		}
 		pos = pos + n
 		// query params
-		_, n, err = bolt.ParseMap(msg.Data[pos:])
+		_, _, err = bolt.ParseMap(msg.Data[pos:])
 		if err != nil {
 			proxy_logger.DebugLog.Println(err)
 			return
 		}
-		pos = pos + n
-	} else {
+	default:
 		panic("shouldn't be starting a tx without a Begin or Run message")
 	}
 
@@ -349,7 +355,7 @@ func startNewTx(msg *bolt.Message, server bolt.BoltConn, back *backend.Backend, 
 		}
 	}
 
-	proxy_logger.DebugLog.Printf("grabbed conn for access to memgraph on host %s\n", host)
+	proxy_logger.DebugLog.Printf("grabbed conn for access to memgraph on host %s", host)
 }
 
 // Primary Transaction server-side event handler, collecting Messages from

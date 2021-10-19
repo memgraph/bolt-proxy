@@ -44,12 +44,13 @@ func HandleHealthCheck(conn net.Conn, buf []byte) error {
 
 	_, err := http.ReadRequest(bufioReader)
 	if err != nil {
-		conn.Write([]byte(BAD_RESPONSE))
+		_, _ = conn.Write([]byte(BAD_RESPONSE))
 		return errors.New("malformed http health check request")
 	}
 
 	// TODO: eventually we should check things are working right, but for
 	// now, just consider it a liveness check.
-	conn.Write([]byte(OK_RESPONSE))
-	return nil
+	_, err = conn.Write([]byte(OK_RESPONSE))
+
+	return err
 }
