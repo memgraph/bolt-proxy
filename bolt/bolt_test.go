@@ -52,7 +52,7 @@ func TestParsingTinyInt(t *testing.T) {
 		t.Fatal("expected 105, got", val)
 	}
 
-	val, err = ParseTinyInt(0x81)
+	_, err = ParseTinyInt(0x81)
 	if err == nil {
 		t.Fatal("expected to fail parsing, value is a tiny-string and not tiny-int!")
 	}

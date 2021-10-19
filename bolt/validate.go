@@ -27,7 +27,7 @@ type Mode string
 
 const (
 	ReadMode  Mode = "READ"
-	WriteMode      = "WRITE"
+	WriteMode Mode = "WRITE"
 )
 
 // Inspect bytes for valid Bolt Magic pattern, returning true if found.
@@ -63,11 +63,11 @@ func ValidateMagic(magic []byte) (bool, error) {
 // an error and an empty byte array.
 func ValidateHandshake(client, server []byte) ([]byte, error) {
 	if len(server) != 4 {
-		return nil, errors.New(fmt.Sprintf("server handshake wrong size is %v", len(server)))
+		return nil, fmt.Errorf("server handshake wrong size is %v", len(server))
 	}
 
 	if len(client) != 16 {
-		return nil, errors.New(fmt.Sprintf("client handshake wrong size %v", len(client)))
+		return nil, fmt.Errorf("client handshake wrong size %v", len(client))
 	}
 
 	chosen := make([]byte, 4)

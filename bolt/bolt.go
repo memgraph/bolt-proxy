@@ -36,21 +36,21 @@ type Type string
 
 const (
 	ResetMsg    Type = "RESET"
-	RunMsg           = "RUN"
-	DiscardMsg       = "DISCARD"
-	PullMsg          = "PULL"
-	RecordMsg        = "RECORD"
-	SuccessMsg       = "SUCCESS"
-	IgnoreMsg        = "IGNORE"
-	FailureMsg       = "FAILURE"
-	HelloMsg         = "HELLO"
-	GoodbyeMsg       = "GOODBYE"
-	BeginMsg         = "BEGIN"
-	CommitMsg        = "COMMIT"
-	RollbackMsg      = "ROLLBACK"
-	UnknownMsg       = "?UNKNOWN?"
-	NopMsg           = "NOP"
-	ChunkedMsg       = "CHUNKED" // not a true bolt message
+	RunMsg      Type = "RUN"
+	DiscardMsg  Type = "DISCARD"
+	PullMsg     Type = "PULL"
+	RecordMsg   Type = "RECORD"
+	SuccessMsg  Type = "SUCCESS"
+	IgnoreMsg   Type = "IGNORE"
+	FailureMsg  Type = "FAILURE"
+	HelloMsg    Type = "HELLO"
+	GoodbyeMsg  Type = "GOODBYE"
+	BeginMsg    Type = "BEGIN"
+	CommitMsg   Type = "COMMIT"
+	RollbackMsg Type = "ROLLBACK"
+	UnknownMsg  Type = "?UNKNOWN?"
+	NopMsg      Type = "NOP"
+	ChunkedMsg  Type = "CHUNKED" // not a true bolt message
 )
 
 // Parse a byte into the corresponding Bolt message Type
@@ -153,7 +153,6 @@ func ParseMap(buf []byte) (map[string]interface{}, int, error) {
 		case 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7: // tiny-int
 			val, err := ParseTinyInt(buf[pos])
 			if err != nil {
-				panic(err)
 				return result, pos, err
 			}
 			result[name] = val
@@ -161,7 +160,6 @@ func ParseMap(buf []byte) (map[string]interface{}, int, error) {
 		case 0x8: // tiny-string
 			val, n, err := ParseTinyString(buf[pos:])
 			if err != nil {
-				panic(err)
 				return result, pos, err
 			}
 			result[name] = val
@@ -169,7 +167,6 @@ func ParseMap(buf []byte) (map[string]interface{}, int, error) {
 		case 0x9: // tiny-array
 			val, n, err := ParseArray(buf[pos:])
 			if err != nil {
-				panic(err)
 				return result, pos, err
 			}
 			result[name] = val
@@ -177,7 +174,6 @@ func ParseMap(buf []byte) (map[string]interface{}, int, error) {
 		case 0xa: // tiny-map
 			value, n, err := ParseMap(buf[pos:])
 			if err != nil {
-				panic(err)
 				return result, pos, err
 			}
 			result[name] = value
@@ -239,7 +235,7 @@ func ParseMap(buf []byte) (map[string]interface{}, int, error) {
 // Parse a TinyInt...which is a simply 7-bit number.
 func ParseTinyInt(b byte) (int, error) {
 	if b > 0x7f {
-		return 0, errors.New("expected tiny-int!")
+		return 0, errors.New("expected tiny-int")
 	}
 	return int(b), nil
 }
@@ -276,7 +272,7 @@ func ParseInt(buf []byte) (int, int, error) {
 // Otherwise, return an empty string, 0, and an error.
 func ParseTinyString(buf []byte) (string, int, error) {
 	if len(buf) == 0 || buf[0]>>4 != 0x8 {
-		return "", 0, errors.New("expected tiny-string!")
+		return "", 0, errors.New("expected tiny-string")
 	}
 
 	size := int(buf[0] & 0xf)
@@ -284,7 +280,7 @@ func ParseTinyString(buf []byte) (string, int, error) {
 		return "", 1, nil
 	}
 
-	return fmt.Sprintf("%s", buf[1:size+1]), size + 1, nil
+	return string(buf[1 : size+1]), size + 1, nil
 }
 
 // Parse a byte slice into a string, returning the string value, the last
@@ -313,7 +309,7 @@ func ParseString(buf []byte) (string, int, error) {
 
 	// decode the actual string length
 	size := int(binary.BigEndian.Uint64(sizeBytes[len(sizeBytes)-8:]))
-	return fmt.Sprintf("%s", buf[pos:pos+size]), pos + size, nil
+	return string(buf[pos : pos+size]), pos + size, nil
 }
 
 // Parse a byte slice into a TinyArray as an array of interface{} values,
@@ -469,14 +465,24 @@ func IntToBytes(i int) ([]byte, error) {
 		buf.Write([]byte{0xc8, byte(uint(i))})
 	} else if i < 0x10000 {
 		buf.WriteByte(byte(0xc9))
-		binary.Write(buf, binary.BigEndian, uint16(i))
+		err := binary.Write(buf, binary.BigEndian, uint16(i))
+		if err != nil {
+			return nil, err
+		}
 	} else if i < 0x100000000 {
 		buf.WriteByte(byte(0xca))
-		binary.Write(buf, binary.BigEndian, uint32(i))
+		err := binary.Write(buf, binary.BigEndian, uint32(i))
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		buf.WriteByte(byte(0xcb))
-		binary.Write(buf, binary.BigEndian, uint64(i))
+		err := binary.Write(buf, binary.BigEndian, uint64(i))
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	return buf.Bytes(), nil
 }
 
@@ -485,7 +491,7 @@ func TinyMapToBytes(tinymap map[string]interface{}) ([]byte, error) {
 	buf := make([]byte, 1024*4)
 
 	if len(tinymap) > 15 {
-		return []byte{}, errors.New("too many keys for a tinymap!")
+		return []byte{}, errors.New("too many keys for a tinymap")
 	}
 
 	buf[0] = byte(0xa0 + uint8(len(tinymap)))
@@ -502,13 +508,13 @@ func TinyMapToBytes(tinymap map[string]interface{}) ([]byte, error) {
 
 		// now the value
 		val := tinymap[key]
-		switch val.(type) {
+		switch v := val.(type) {
 		case int:
-			raw, err = IntToBytes(val.(int))
+			raw, err = IntToBytes(v)
 		case string:
-			raw, err = StringToBytes(val.(string))
+			raw, err = StringToBytes(v)
 		case map[string]interface{}:
-			raw, err = TinyMapToBytes(val.(map[string]interface{}))
+			raw, err = TinyMapToBytes(v)
 		case nil:
 			raw = []byte{0xc0}
 		default:
