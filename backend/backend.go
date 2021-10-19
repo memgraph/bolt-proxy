@@ -28,19 +28,19 @@ import (
 )
 
 type Parameters struct {
-	debugMode          bool
 	bindOn             string
 	proxyTo            string
 	username, password string
 	certFile, keyFile  string
+	debugMode          bool
 }
 
 type Backend struct {
 	monitor        *Monitor
-	tls            bool
 	main_uri       *url.URL
 	auth           Authenticator
 	connectionPool map[string]map[string]bolt.BoltConn
+	tls            bool
 }
 
 func NewBackend(username, password, uri string, auth Authenticator, hosts ...string) (*Backend, error) {
@@ -55,7 +55,7 @@ func NewBackend(username, password, uri string, auth Authenticator, hosts ...str
 	case "bolt", "neo4j":
 		// ok
 	default:
-		return nil, errors.New("Invalid bolt connection scheme")
+		return nil, errors.New("invalid bolt connection scheme")
 	}
 
 	monitor, err := NewMonitor(username, password, uri, hosts...)
@@ -143,12 +143,13 @@ func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltCon
 	}
 
 	msg := bolt.IdentifyType(buf)
-	if msg == bolt.FailureMsg {
+	switch msg {
+	case bolt.FailureMsg:
 		// See if we can extract the error message
-		r, _, err := bolt.ParseMap(buf[4:n])
-		if err != nil {
+		r, _, errParse := bolt.ParseMap(buf[4:n])
+		if errParse != nil {
 			conn.Close()
-			return nil, err
+			return nil, errParse
 		}
 
 		val, found := r["message"]
@@ -161,15 +162,23 @@ func (b *Backend) InitBoltConnection(hello []byte, network string) (bolt.BoltCon
 		}
 		conn.Close()
 		return nil, errors.New("could not parse auth server response")
-	} else if msg == bolt.SuccessMsg {
+	case bolt.SuccessMsg:
 		// The only happy outcome! Keep conn open.
 		bolt_connection := bolt.NewDirectConn(conn)
 		return bolt_connection, nil
 	}
 
 	// Try to be polite and say goodbye if we know we failed.
-	conn.Write([]byte{0x00, 0x02, 0xb0, 0x02})
-	conn.Close()
+	_, err = conn.Write([]byte{0x00, 0x02, 0xb0, 0x02})
+	if err != nil {
+		return nil, fmt.Errorf("write: %v", err)
+	}
+
+	err = conn.Close()
+	if err != nil {
+		return nil, fmt.Errorf("close: %v", err)
+	}
+
 	return nil, errors.New("unknown error from auth server")
 }
 
@@ -182,6 +191,9 @@ func (b *Backend) Authenticate(hello *bolt.Message) error {
 	// TODO: clean up this api...push the dirt into Bolt package?
 	data := hello.Data[4:]
 	client_string, pos, err := bolt.ParseString(data)
+	if err != nil {
+		return fmt.Errorf("parse: %v", err)
+	}
 	proxy_logger.DebugLog.Printf("client string %s", client_string)
 
 	auth_data := data[pos:]
