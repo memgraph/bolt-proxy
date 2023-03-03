@@ -88,5 +88,12 @@ for Neo4js [bolt-proxy](https://github.com/voutilad/bolt-proxy) and for
 providing a good base and inspiration for this bolt-proxy.
 
 ## License
+Project is licensed under [Apache License 2.0](https://github.com/memgraph/bolt-proxy/blob/main/LICENSE).
 
-[Apache License 2.0](https://github.com/memgraph/bolt-proxy/blob/main/LICENSE)
+The original project made by Dave Voutila is licensed under [MIT](https://github.com/memgraph/bolt-proxy/blob/main/MIT.license)
+License.
+
+```
+Copyright 2020 Dave Voutila (dave@sisu.io)
+Copyright 2023 MEMGRAPH LTD
+```
